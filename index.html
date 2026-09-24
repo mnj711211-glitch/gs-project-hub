@@ -1048,7 +1048,7 @@ function viewProjects(){
         <th style="width:44px"></th><th>專案名稱</th><th style="width:92px">專案代號</th><th style="width:80px">狀態</th>
         <th style="width:148px">實際 / 預定進度</th><th style="width:66px">偏差</th>
         <th style="width:104px">預定開始</th><th style="width:104px">預期完工</th>
-        <th style="width:84px">類別</th><th style="width:150px">專案主持人</th><th style="width:62px"></th>
+        <th style="width:84px">類別</th><th style="width:150px">專案主持人</th><th style="width:104px"></th>
       </tr></thead>
       <tbody>${list.length?list.map(p=>{
         const v=p._prog-p._plan;
@@ -1064,7 +1064,9 @@ function viewProjects(){
           <td class="num muted">${p._fcEnd?fmt(p._fcEnd):'—'}</td>
           <td class="muted">${esc(p.category||'—')}</td>
           <td>${esc(p.owner||'—')}</td>
-          <td><button class="btn sm gh" onclick="editProject('${p.id}')">編輯</button></td>
+          <td style="white-space:nowrap">
+            <button class="btn sm gh" onclick="editProject('${p.id}')">編輯</button>
+            <button class="btn sm gh dgr" onclick="delProject('${p.id}')" title="刪除專案">刪除</button></td>
         </tr>`;}).join(''):`<tr><td colspan="11"><div class="empty"><div class="big">▤</div>沒有符合條件的專案</div></td></tr>`}
       </tbody>
     </table>
@@ -1958,7 +1960,8 @@ function projectForm(p,isNew){
     ${isNew?`<label class="field"><span>套用時程範本</span><select id="f_tpl">
        <option value="epc">EPC 標準時程（81 項任務，含階段權重）</option><option value="none">空白專案</option></select></label>`:''}
     </div>`,
-    `<button class="btn" onclick="closeModal()">取消</button>
+    `${isNew?'':`<button class="btn gh dgr" style="margin-right:auto" onclick="delProject('${p.id}')">刪除此專案</button>`}
+     <button class="btn" onclick="closeModal()">取消</button>
      <button class="btn pri" onclick="saveProject('${p.id}',${isNew})">${isNew?'建立專案':'儲存'}</button>`,true);
 }
 function saveProject(id,isNew){
@@ -1988,7 +1991,13 @@ function delProject(id){
     `<button class="btn" onclick="closeModal()">取消</button>
      <button class="btn pri" style="background:var(--danger);border-color:var(--danger)" onclick="doDelProject('${id}')">確定刪除</button>`);
 }
-function doDelProject(id){ DB.projects=DB.projects.filter(x=>x.id!==id); save(); closeModal(); go('#/projects'); render(); toast('已刪除'); }
+function doDelProject(id){
+  const p=DB.projects.find(x=>x.id===id);
+  // 連帶清掉這個案子在雲端的照片，不然會變成沒人認領的孤兒檔
+  if(p) (p.forms||[]).forEach(f=>(f.photos||[]).forEach(ph=>cloudDelPhoto(ph.id)));
+  DB.projects=DB.projects.filter(x=>x.id!==id);
+  save(); closeModal(); go('#/projects'); toast('已刪除專案');
+}
 function resetTasks(id){
   const p=DB.projects.find(x=>x.id===id);
   modal('重置任務',`<div class="modal-b"><p>將 <b>${esc(p.name)}</b> 的任務清單換成 EPC 標準範本（81 項），<b>現有進度與日誌會清空</b>。</p></div>`,
