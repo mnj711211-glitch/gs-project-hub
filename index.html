@@ -1,0 +1,2087 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>綠源 專案進度與文件管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --panel-2:#fafbfc; --line:#e3e6ea; --line-2:#eef0f3;
+  --txt:#1b2027; --txt-2:#5b6472; --txt-3:#8b95a3;
+  --brand:#1f6f4f; --brand-2:#2c8f67; --brand-soft:#e8f4ee;
+  --accent:#2563eb; --warn:#c2710c; --warn-soft:#fdf3e3; --danger:#c0392b; --danger-soft:#fdeceb;
+  --ok:#1f8a4c; --ok-soft:#e9f6ee; --idle:#8b95a3; --idle-soft:#f0f2f5;
+  --plan:#8b95a3; --base:#c9d0d8;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
+  --shadow-lg:0 10px 30px rgba(16,24,40,.12);
+  --r:10px; --sidebar:224px;
+}
+:root[data-theme="dark"]{
+  --bg:#12151a; --panel:#1a1e25; --panel-2:#1f242c; --line:#2b313b; --line-2:#242a32;
+  --txt:#e8ecf1; --txt-2:#a4afbd; --txt-3:#78838f;
+  --brand:#46b98a; --brand-2:#5ccb9c; --brand-soft:#17302a;
+  --accent:#6ea8fe; --warn:#e2a34a; --warn-soft:#2e2718; --danger:#f07a6d; --danger-soft:#33201e;
+  --ok:#4cc27c; --ok-soft:#162c1f; --idle:#78838f; --idle-soft:#242a32;
+  --plan:#78838f; --base:#3a424e;
+  --shadow:0 1px 2px rgba(0,0,0,.3); --shadow-lg:0 12px 34px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:Inter,"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;font-size:14px;line-height:1.55;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;border:2px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+
+.app{display:flex;min-height:100vh}
+.side{width:var(--sidebar);flex:0 0 var(--sidebar);background:var(--panel);border-right:1px solid var(--line);
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;z-index:20}
+.brand{display:flex;align-items:center;gap:10px;padding:16px 16px 14px;border-bottom:1px solid var(--line-2)}
+.brand .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--brand),var(--brand-2));
+  display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;letter-spacing:.5px}
+.brand b{font-size:14px;letter-spacing:.2px}
+.brand small{display:block;color:var(--txt-3);font-size:11px;font-weight:400;letter-spacing:.3px}
+.nav{padding:10px 10px;flex:1;overflow:auto}
+.nav-label{font-size:11px;color:var(--txt-3);padding:12px 8px 6px;letter-spacing:.6px;font-weight:600}
+.nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;color:var(--txt-2);
+  font-weight:500;cursor:pointer;margin-bottom:2px;transition:.12s}
+.nav a:hover{background:var(--panel-2);color:var(--txt)}
+.nav a.on{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.nav a .ic{width:16px;text-align:center;opacity:.9}
+.nav a .cnt{margin-left:auto;font-size:11px;color:var(--txt-3);font-variant-numeric:tabular-nums}
+.side-foot{padding:10px;border-top:1px solid var(--line-2);display:flex;gap:6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+
+.top{position:sticky;top:0;z-index:15;background:var(--panel);border-bottom:1px solid var(--line);
+  padding:0 20px;height:56px;display:flex;align-items:center;gap:14px}
+.crumb{display:flex;align-items:center;gap:8px;color:var(--txt-3);font-size:13px;min-width:0}
+.crumb b{color:var(--txt);font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb .sep{opacity:.5}
+.top .sp{flex:1}
+.search{position:relative}
+.search input{width:230px;padding:7px 10px 7px 30px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel-2);outline:none}
+.search input:focus{border-color:var(--brand);background:var(--panel)}
+.search .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--txt-3);font-size:13px}
+.content{padding:20px;flex:1;min-width:0}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel);cursor:pointer;font-weight:500;transition:.12s;white-space:nowrap}
+.btn:hover{background:var(--panel-2);border-color:var(--txt-3)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.pri:hover{background:var(--brand-2);border-color:var(--brand-2)}
+.btn.sm{padding:4px 9px;font-size:12.5px;border-radius:7px}
+.btn.gh{border-color:transparent;background:transparent;color:var(--txt-2)}
+.btn.gh:hover{background:var(--panel-2);color:var(--txt)}
+.btn.dgr{color:var(--danger)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-h{padding:13px 16px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:10px}
+.card-h h3{margin:0;font-size:14px;font-weight:600}
+.card-h .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;
+  background:var(--idle-soft);color:var(--txt-2);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.run{background:#e8effd;color:var(--accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.late{background:var(--danger-soft);color:var(--danger)}
+:root[data-theme="dark"] .pill.run{background:#1b2740}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 7px}
+.muted{color:var(--txt-3)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.grid{display:grid;gap:14px}
+.empty{padding:50px 20px;text-align:center;color:var(--txt-3)}
+.empty .big{font-size:34px;opacity:.35;margin-bottom:10px}
+input[type=range]{accent-color:var(--brand);cursor:pointer}
+
+table.tbl{width:100%;border-collapse:separate;border-spacing:0}
+table.tbl th{position:sticky;top:0;background:var(--panel-2);text-align:left;font-size:12px;font-weight:600;
+  color:var(--txt-2);padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+table.tbl td{padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+table.tbl tbody tr:hover{background:var(--panel-2)}
+table.tbl tbody tr:last-child td{border-bottom:none}
+.star{cursor:pointer;color:var(--line);font-size:16px;line-height:1}
+.star.on{color:#e8b023}
+.link{color:var(--brand);font-weight:600;cursor:pointer}
+.link:hover{text-decoration:underline}
+
+.bar{height:6px;border-radius:99px;background:var(--line-2);overflow:visible;min-width:56px;position:relative}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:99px}
+.bar.late i{background:var(--danger)}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--plan);border-radius:2px}
+
+.field{display:block;margin-bottom:12px}
+.field span{display:block;font-size:12px;color:var(--txt-2);margin-bottom:5px;font-weight:500}
+.field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.row4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+
+.mask{position:fixed;inset:0;background:rgba(15,20,28,.45);backdrop-filter:blur(2px);z-index:100;
+  display:flex;align-items:flex-start;justify-content:center;padding:44px 16px;overflow:auto}
+.modal{background:var(--panel);border-radius:14px;box-shadow:var(--shadow-lg);width:100%;max-width:560px;
+  border:1px solid var(--line);animation:pop .15s ease-out}
+.modal.wide{max-width:900px}
+@keyframes pop{from{opacity:0;transform:translateY(-8px)}}
+.modal-h{padding:16px 18px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:8px}
+.modal-h h3{margin:0;font-size:15px;flex:1}
+.modal-b{padding:18px;max-height:calc(100vh - 220px);overflow:auto}
+.modal-f{padding:14px 18px;border-top:1px solid var(--line-2);display:flex;gap:8px;
+  justify-content:flex-end;flex-wrap:wrap}
+.mtabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line-2)}
+.mtabs button{border:0;background:none;padding:9px 12px;cursor:pointer;color:var(--txt-2);font-weight:500;
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+.mtabs button.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 20px;background:var(--panel);
+  position:sticky;top:56px;z-index:14}
+.tabs a{padding:11px 14px;font-weight:500;color:var(--txt-2);border-bottom:2px solid transparent;cursor:pointer;
+  margin-bottom:-1px;white-space:nowrap}
+.tabs a:hover{color:var(--txt)}
+.tabs a.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .lb{font-size:12px;color:var(--txt-3);font-weight:500}
+.kpi .vl{font-size:24px;font-weight:700;margin-top:4px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:11.5px;color:var(--txt-3);margin-top:2px}
+.kpi.bad .vl{color:var(--danger)} .kpi.good .vl{color:var(--ok)}
+
+.log{border-left:2px solid var(--line);padding-left:14px;margin-left:4px}
+.log .it{position:relative;padding:0 0 14px}
+.log .it:before{content:'';position:absolute;left:-19px;top:6px;width:8px;height:8px;border-radius:50%;
+  background:var(--brand);border:2px solid var(--panel)}
+.log .mt{font-size:11.5px;color:var(--txt-3);font-variant-numeric:tabular-nums}
+.log .bd{white-space:pre-wrap;font-size:13px;margin-top:2px}
+
+.gantt-wrap{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel);
+  box-shadow:var(--shadow)}
+.g-left{flex:0 0 430px;border-right:1px solid var(--line);overflow:hidden}
+.g-right{flex:1;overflow-x:auto;overflow-y:hidden;position:relative}
+.g-head{height:52px;background:var(--panel-2);border-bottom:1px solid var(--line);display:flex;align-items:flex-end;
+  font-size:12px;color:var(--txt-2);position:sticky;top:0;z-index:3}
+.g-left .g-head{padding:0 12px 9px;font-weight:600}
+.g-row{height:34px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;font-size:13px}
+.g-row:hover{background:var(--panel-2)}
+.g-left .g-row{padding:0 12px;gap:8px}
+.g-row.sum{font-weight:700;background:var(--panel-2)}
+.g-code{color:var(--txt-3);font-size:11.5px;width:48px;flex:0 0 48px;font-variant-numeric:tabular-nums}
+.g-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.g-name:hover{color:var(--brand)}
+.g-canvas{position:relative}
+.g-months{display:flex;height:26px;border-bottom:1px solid var(--line-2)}
+.g-month{border-right:1px solid var(--line);font-size:11.5px;font-weight:600;padding:5px 6px;
+  white-space:nowrap;overflow:hidden;color:var(--txt-2)}
+.g-days{display:flex;height:26px}
+.g-day{border-right:1px solid var(--line-2);font-size:10px;text-align:center;color:var(--txt-3);padding-top:6px;
+  flex:0 0 auto;overflow:hidden}
+.g-day.we{background:var(--panel-2)}
+.g-grid{position:absolute;inset:0;pointer-events:none}
+.g-grid .we{position:absolute;top:0;bottom:0;background:var(--panel-2);opacity:.75}
+.g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--danger);opacity:.6;z-index:4}
+.g-base{position:absolute;height:7px;border-radius:3px;background:var(--base);top:5px}
+.g-bar{position:absolute;height:14px;border-radius:4px;background:var(--brand);top:14px;cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,.18);overflow:hidden}
+.g-bar:hover{filter:brightness(1.12)}
+.g-bar.crit{background:var(--danger)}
+.g-bar.done{background:var(--ok)}
+.g-bar.summary{height:9px;top:12px;border-radius:3px;background:var(--txt-2)}
+.g-bar i{position:absolute;right:0;top:0;bottom:0;background:rgba(255,255,255,.5)}
+.g-lb{position:absolute;font-size:11px;color:var(--txt-3);white-space:nowrap}
+.g-ms{position:absolute;width:12px;height:12px;background:var(--warn);transform:rotate(45deg);top:14px;border-radius:2px}
+
+.doc-lay{display:flex;gap:14px;align-items:flex-start}
+.tree{flex:0 0 250px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px;
+  box-shadow:var(--shadow);max-height:calc(100vh - 190px);overflow:auto}
+.tnode{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;cursor:pointer;font-size:13px;
+  color:var(--txt-2);user-select:none}
+.tnode:hover{background:var(--panel-2);color:var(--txt)}
+.tnode.on{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.tnode .tw{width:14px;text-align:center;font-size:10px;color:var(--txt-3)}
+.tnode .cnt{margin-left:auto;font-size:11px;color:var(--txt-3)}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:16px;text-align:center;color:var(--txt-3);
+  background:var(--panel);margin-bottom:12px;transition:.15s;font-size:13px}
+.drop.hot{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:14px}
+.fcard{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--panel-2);cursor:pointer;transition:.12s}
+.fcard:hover{border-color:var(--brand);transform:translateY(-1px);box-shadow:var(--shadow)}
+.fcard .ico{font-size:26px;margin-bottom:8px}
+.fcard .nm{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:6px 11px;cursor:pointer;color:var(--txt-2);font-size:12.5px}
+.seg button.on{background:var(--brand);color:#fff}
+.tag{display:inline-block;padding:1px 7px;border-radius:5px;background:var(--brand-soft);color:var(--brand);
+  font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* 表單：檢查項目（手機也好按） */
+.fgridx{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0 12px}
+.cklist{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ck{display:grid;grid-template-columns:1fr auto 200px;gap:10px;align-items:center;
+  padding:10px 12px;border-bottom:1px solid var(--line-2)}
+.ck:last-child{border-bottom:none}
+.ck:nth-child(odd){background:var(--panel-2)}
+.ck-t{font-size:13px;line-height:1.45}
+.ck-r{display:flex;gap:5px}
+.ck-b{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;
+  cursor:pointer;font-size:12.5px;color:var(--txt-2);min-width:58px;transition:.12s;white-space:nowrap}
+.ck-b:hover{border-color:var(--txt-3)}
+.ck-b.on.ok{background:var(--ok);border-color:var(--ok);color:#fff;font-weight:600}
+.ck-b.on.ng{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:600}
+.ck-b.on.na{background:var(--txt-3);border-color:var(--txt-3);color:#fff;font-weight:600}
+.ck-n{padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);
+  outline:none;font-size:12.5px;width:100%}
+.ck-n:focus{border-color:var(--brand)}
+@media(max-width:720px){
+  .ck{grid-template-columns:1fr;gap:8px}
+  .ck-b{flex:1;padding:10px 8px;font-size:13px}
+  .modal-b{padding:14px}
+  .row2,.row3,.row4,.fgridx{grid-template-columns:1fr}
+  .mask{padding:0}
+  .modal{border-radius:0;min-height:100vh;max-width:100%;overflow:hidden}
+  .modal-h h3{font-size:14px;overflow:hidden;text-overflow:ellipsis}
+  .modal-f{padding:12px 14px}
+  .modal-f .btn{flex:1 1 44%;justify-content:center}
+  .modal-f .btn[style*="margin-right:auto"]{flex:1 1 100%;margin-right:0!important}
+  .cklist{overflow:hidden}
+}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters select,.filters input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);outline:none}
+.nosave{position:fixed;left:0;right:0;bottom:0;z-index:400;background:var(--warn-soft);
+  color:var(--warn);border-top:1px solid var(--warn);padding:11px 18px;font-size:13px;
+  display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;font-weight:500}
+.nosave b{color:var(--txt)}
+.nosave button{border:1px solid var(--warn);background:transparent;color:var(--warn);
+  border-radius:7px;padding:3px 10px;cursor:pointer;font-size:12.5px;font-weight:600}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--txt);color:var(--bg);
+  padding:10px 18px;border-radius:10px;z-index:300;box-shadow:var(--shadow-lg);font-weight:500;font-size:13px}
+.burger{display:none;font-size:17px;padding:5px 9px;margin-left:-6px}
+.side-mask{display:none;position:fixed;inset:0;background:rgba(15,20,28,.4);z-index:19}
+.side-mask.on{display:block}
+@media(max-width:1000px){
+  .burger{display:inline-flex}
+  .side{position:fixed;left:-240px;transition:left .2s;box-shadow:var(--shadow-lg)}
+  .side.open{left:0}
+  .search input{width:150px}
+  .doc-lay{flex-direction:column}.tree{flex:none;width:100%;max-height:220px}
+  .g-left{flex:0 0 200px}
+  .content{padding:14px}
+  .tabs{padding:0 14px;overflow-x:auto}
+}
+@media(max-width:620px){
+  .top{padding:0 12px;gap:8px}
+  .crumb b{font-size:14px}
+  .crumb span:not(.sep){display:none}
+  .search input{width:110px}
+  .kpis{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side-mask" id="sideMask" onclick="toggleSide()"></div>
+  <aside class="side" id="side">
+    <div class="brand">
+      <div class="mark">GS</div>
+      <div><b>專案管理中心</b><small>EPC Project Hub</small></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <button class="btn sm gh" onclick="toggleTheme()" title="切換深淺色">🌓 外觀</button>
+      <button class="btn sm gh" onclick="openBackup()" title="備份 / 還原">💾 資料</button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <button class="btn gh burger" onclick="toggleSide()" title="選單">☰</button>
+      <div class="crumb" id="crumb"></div>
+      <div class="sp"></div>
+      <div class="search"><span class="ic">🔍</span><input id="q" placeholder="搜尋專案、任務、文件…" oninput="onSearch(this.value)"></div>
+      <button class="btn pri" onclick="newProject()">＋ 新增專案</button>
+    </header>
+    <div id="tabs"></div>
+    <div class="content" id="view"></div>
+  </main>
+</div>
+<div id="modal"></div>
+<script>
+/* =======================================================================
+   綠源 專案進度與文件管理
+   資料模型對齊現用 ezteamwork：權重彙總、進度模型、三軌日期、進度日誌、
+   文件掛 WBS 任務。資料存 localStorage，可匯出 JSON 放公司雲端硬碟。
+   ======================================================================= */
+
+/* ---------- EPC 標準時程範本（來源：EPC時程.xls） ---------- */
+const EPC_TEMPLATE = `
+1|案場資訊||
+1.1|土地/建物現況勘整|5|
+1.2|簽約|20|
+1.3|專案啟始會議|14|1.2FS0
+1.4|收款：買賣合約第一期款|1|1.2FS0
+1.5|收款：買賣合約第二期款|1|
+1.6|收款：買賣合約第三期款|1|
+1.7|收款：買賣合約第四期款|1|
+1.8|收款：買賣合約第五期款|1|
+1.9|收款：承攬合約第一期款|1|
+1.10|收款：承攬合約第二期款|1|
+1.11|收款：承攬合約第三期款|1|
+1.12|收款：承攬合約第四期款|1|
+1.13|收款：承攬合約第五期款|1|
+2|規劃設計||
+2.1|系統設計與配置|7|1.2FS0
+2.2|系統設計送審|7|2.1FS0
+2.3|初版採購清單|3|2.2FS0
+2.4|技師單線圖|1|
+2.5|支架設計與結構計算|20|1.2FS0,2.1FS0
+2.6|支架結構送審|7|2.5FS0
+2.7|施工圖繪製|14|2.2FS0
+2.8|施工文件送審|7|2.7FS0
+2.9|發包清單製作|5|2.8FS0
+2.10|終版採購清單|5|2.8FS0
+3|申辦作業||
+3.1|申請資料準備與用印|10|1.2FS0
+3.2|併聯審查意見書|55|2.1FS0
+3.3|同意備案核准函|21|3.2FS0
+3.4|細部協商|40|3.3FS0
+3.5|免雜備查函|37|3.3FS0
+3.6|電能購售契約|37|3.4FS0
+3.7|報竣+掛表|14|3.6FS0,5.2.10FF0
+3.8|併聯試運轉函|21|3.7FS0
+3.9|免雜竣工備查函|21|3.5FS0,5.2.10FF0
+3.10|設備登記核准函|30|3.8FS0,3.9FS0
+3.11|正式購售電函|21|3.10FS0
+3.12|電費單|30|3.11FS0
+3.13|電氣圖調閱作業|1|
+4|採購發包||
+4.1|跑件服務發包|3|2.1FS0,2.3FS0
+4.2|施工材料採購||
+4.2.1|模組採購|60|2.3FS0
+4.2.2|逆變器採購|60|2.3FS0
+4.2.3|支架採購|60|2.3FS0
+4.2.4|勞安設施採購|50|2.3FS0
+4.2.5|保險申請|30|2.3FS0
+4.2.6|盤體箱體採購|120|2.3FS0,3.4FS0
+4.2.7|線材採購|30|2.10FS0
+4.2.8|線槽採購|30|2.10FS0
+4.2.9|其他採購|30|2.10FS0
+4.2.10|變壓器採購|180|2.3FS0,3.4FS0
+4.3|施工廠商發包|30|2.7FS0,2.9FS0
+5|工程施工||
+5.1|前期作業||
+5.1.1|工程啟始會議|3|
+5.1.2|協議組織及第一次工程協調會|1|5.1.1FS0
+5.2|工程作業||
+5.2.1|土建工程|30|5.2.2FS0
+5.2.2|支架安裝|20|5.1.2FS0
+5.2.3|勞安設施施工|14|4.2.4FS0,4.3FS0,5.1.2FS0
+5.2.4|模組安裝|20|4.2.1FF0,4.2.3FS0,5.2.3FS0,5.2.1FS0
+5.2.5|直流線路施工|10|4.2.7FS0,4.2.8FS0,5.2.4FS0
+5.2.6|逆變器施作|6|4.2.2FS0,4.2.6FS0,4.2.10FS0,5.2.13FS0
+5.2.7|盤體施作|7|2.1FS0
+5.2.8|交流線路施工|8|4.2.7FS0,4.2.8FS0,5.2.6FS0
+5.2.9|系統測試--電壓/絕緣/接地測試|3|5.2.8FS0
+5.2.10|併接工程|1|6.8FS0
+5.2.11|清洗水路施工|7|4.2.9FS0
+5.2.12|監控設備安裝|30|4.2.9FS0,5.2.6FS0
+5.2.13|機電平台施作|7|5.2.4FS0
+6|檢測作業||
+6.1|檢查點查核(一)|1|5.2.4SS1
+6.2|檢查點查核(二)|1|5.2.6FS0
+6.3|檢查點查核(三)|2|5.2.10FS0
+6.4|第一次驗收|3|3.7FS0
+6.5|缺失改善|8|6.4FS0
+6.6|複驗|7|6.5FS0
+6.7|結案報告|10|6.6FS0
+6.8|高壓檢測|1|5.2.8FS0
+`.trim();
+
+/** 六大階段權重（沿用現行實務值，合計 100） */
+const STAGE_WEIGHT = {'1':10,'2':20,'3':10,'4':20,'5':35,'6':5};
+
+const FOLDER_TEMPLATE = [
+  {id:'1000',name:'1000 案場資訊'},
+  {id:'2000',name:'2000 規劃設計',children:[
+    {id:'2100',name:'2100 系統設計'},{id:'2200',name:'2200 結構計算'},{id:'2300',name:'2300 施工圖'}]},
+  {id:'3000',name:'3000 申辦文件',children:[
+    {id:'3100',name:'3100 客戶文件'},{id:'3200',name:'3200 能源署'},{id:'3300',name:'3300 台電'},
+    {id:'3400',name:'3400 主管機關'},{id:'3500',name:'3500 其他'}]},
+  {id:'4000',name:'4000 採購資料',children:[
+    {id:'4100',name:'4100 報價與比價'},{id:'4200',name:'4200 採購合約'},{id:'4300',name:'4300 出貨文件'}]},
+  {id:'5000',name:'5000 施工',children:[
+    {id:'5100',name:'5100 施工日報'},{id:'5200',name:'5200 檢驗紀錄'},{id:'5300',name:'5300 安衛文件'}]},
+  {id:'6000',name:'6000 竣工文件',children:[
+    {id:'6100',name:'6100 竣工圖'},{id:'6200',name:'6200 驗收文件'},{id:'6300',name:'6300 保固文件'}]},
+];
+
+const FLOW_STATUS  = ['未送審','審核中','已核准','退件','已歸檔'];
+const DOC_CATEGORY = ['專案基本資料相關','任務相關','其他文件'];
+const PROJ_STATUS  = ['規劃中','進行中','暫停','已完工','已結案'];
+const SECRET_LV    = ['公開','授權','機密'];
+const PROG_MODEL   = ['比例法','開工法'];
+const ROLES        = ['專案主持人','管理人員','工作人員','瀏覽者'];
+const FORM_STATUS  = ['草稿','已送出','已核准','退件'];
+
+/* ---------- 表單範本 ----------
+   check 型＝逐項勾選（合格／不合格／不適用＋備註）
+   欄位與檢查項目皆可在「表單範本」裡改，換成公司實際版本。        */
+const FORM_TEMPLATES = [
+  {id:'log-daily', name:'施工日誌', group:'施工紀錄', icon:'📋',
+   fields:[{k:'date',l:'施工日期',t:'date',req:1},
+           {k:'weather',l:'天氣',t:'sel',o:['晴','多雲','陰','雨','颱風']},
+           {k:'crewOwn',l:'自有人數',t:'num'},{k:'crewSub',l:'協力人數',t:'num'},
+           {k:'work',l:'今日施工項目',t:'area',req:1},
+           {k:'qty',l:'完成數量／進度',t:'area'},
+           {k:'machine',l:'機具進場',t:'text'},
+           {k:'issue',l:'異常狀況與處置',t:'area'},
+           {k:'next',l:'明日預定工作',t:'area'},
+           {k:'by',l:'填表人',t:'text',req:1}]},
+  {id:'log-toolbox', name:'每日施工前工具箱會議記錄', group:'施工紀錄', icon:'🧰',
+   fields:[{k:'date',l:'會議日期',t:'date',req:1},{k:'time',l:'時間',t:'text'},
+           {k:'place',l:'地點',t:'text'},{k:'host',l:'主持人',t:'text',req:1},
+           {k:'count',l:'出席人數',t:'num'},
+           {k:'topic',l:'今日作業內容',t:'area',req:1},
+           {k:'hazard',l:'危害告知事項',t:'area',req:1},
+           {k:'ppe',l:'應著防護具',t:'text'},
+           {k:'note',l:'其他宣導事項',t:'area'}]},
+  {id:'log-safety', name:'勞安工作日誌', group:'施工紀錄', icon:'🦺',
+   fields:[{k:'date',l:'日期',t:'date',req:1},{k:'by',l:'安衛人員',t:'text',req:1},
+           {k:'patrol',l:'巡檢範圍',t:'text'},
+           {k:'found',l:'發現缺失',t:'area'},
+           {k:'fix',l:'改善措施與期限',t:'area'},
+           {k:'accident',l:'意外／虛驚事件',t:'area'}]},
+  {id:'sign-off', name:'簽呈', group:'行政', icon:'📝',
+   fields:[{k:'date',l:'申請日期',t:'date',req:1},{k:'by',l:'申請人',t:'text',req:1},
+           {k:'subject',l:'主旨',t:'text',req:1},
+           {k:'reason',l:'說明',t:'area',req:1},
+           {k:'amount',l:'金額(元)',t:'num'},
+           {k:'suggest',l:'擬辦',t:'area'}]},
+
+  /* --- 進料檢驗表：共用表頭 ＋ 各自檢查項目 --- */
+  ...[
+    ['支架','太陽能模組支架',['型號規格與承認圖相符','表面鍍層無刮傷、剝落、鏽蝕','數量與出貨單相符','螺栓配件齊全','材質證明／鍍鋅厚度報告齊備','外觀無彎曲變形']],
+    ['模組','太陽能模組',['型號、瓦數與採購規格相符','玻璃無破裂、無氣泡、無水痕','框架無變形、無壓傷','接線盒與線纜無破損','序號與出貨清單相符','檢驗報告／保固文件齊備','棧板數量與標示正確']],
+    ['逆變器','逆變器',['型號、容量與採購規格相符','外觀無碰撞變形、無受潮','配件（支架、接頭、說明書）齊全','序號與出貨清單相符','認證文件（CNS／台電併聯）齊備']],
+    ['開關箱','開關箱',['尺寸與承認圖相符','內部元件型號與單線圖相符','防水等級標示符合需求','接地端子完整','外觀無鏽蝕、烤漆無剝落']],
+    ['電纜','電纜',['線徑、絕緣等級與設計相符','外皮無破損、無壓傷','長度／捲數與訂單相符','標示（廠牌、規格、製造日期）清晰','檢驗報告齊備']],
+    ['線槽','金屬線槽',['規格尺寸與施工圖相符','鍍鋅面無刮傷剝落','蓋板與配件齊全','數量與出貨單相符']],
+    ['RSG管','RSG管',['管徑與設計相符','管身無變形、螺牙完整','附件（管夾、接頭）齊全','數量與出貨單相符']],
+    ['PVC管','PVC管',['管徑、厚度與設計相符','管身無破裂變形','耐候等級符合戶外使用','數量與出貨單相符']],
+  ].map(([short,full,items])=>({
+    id:'iqc-'+short, name:'進料檢驗表 - '+full, group:'進料檢驗', icon:'📦',
+    fields:[{k:'date',l:'檢驗日期',t:'date',req:1},
+            {k:'vendor',l:'供應商',t:'text',req:1},
+            {k:'spec',l:'品名／規格',t:'text',req:1},
+            {k:'qty',l:'進料數量',t:'text'},
+            {k:'lot',l:'批號／出貨單號',t:'text'},
+            {k:'by',l:'檢驗人員',t:'text',req:1}],
+    items})),
+
+  /* --- 自主檢查表 --- */
+  ...[
+    ['支架及固定座',['基礎／固定座位置與施工圖相符','錨栓規格、埋深符合設計','扭力值符合規範並做標記','支架垂直度／水平度在容許範圍','防水收頭完整無滲漏','結構件無變形、焊道無裂縫','接地導線已確實連接']],
+    ['模組安裝',['模組型號、排列與配置圖相符','壓塊位置符合模組廠商規範','螺栓扭力符合規範','模組間隙均勻、外觀整齊','模組表面無破損、無踩踏痕跡','接地線連接確實','串列數量與單線圖相符']],
+    ['模組開路電壓',['各串列開路電壓量測值記錄完整','串列間電壓差在容許範圍內','極性正確無反接','量測時天候與時間已記錄','量測儀器在校驗有效期內']],
+    ['接地電阻',['接地棒埋設深度符合規範','接地電阻值符合規定（＜100Ω）','各接地點已確實連接','量測儀器在校驗有效期內','量測值記錄完整']],
+    ['逆變器安裝',['安裝位置通風散熱良好','固定牢固、垂直度正確','DC／AC 端子扭力符合規範','進出線防水處理完整','接地確實','參數設定與台電併聯要求相符','通訊線連接正常']],
+    ['高低壓開關箱及變壓器',['設備位置與配置圖相符','基礎固定牢固','一次／二次側接線正確','相序確認正確','絕緣電阻測試合格','接地系統完整','標示牌與警告標誌齊全']],
+    ['電氣明管施工',['管路走向與施工圖相符','管夾間距符合規範','彎曲半徑符合規範','管口護套已裝設','防水收頭完整','管路接地連續性良好']],
+    ['清洗水路施工',['管路走向與設計相符','加壓馬達安裝固定牢固','各出水點出水正常','管路無滲漏','水源供應正常','控制箱防水處理完整']],
+    ['電纜線施工',['線徑與單線圖相符','布線整齊、固定確實','彎曲半徑符合規範','端子壓接確實','標示牌（來源／去向）齊全','穿越處防火填塞完成']],
+    ['電纜絕緣電阻測試',['測試前已確認線路無載','絕緣電阻值符合規範','各相與接地間測試值記錄完整','量測儀器在校驗有效期內','測試後線路已復歸']],
+    ['監控系統',['監控主機安裝固定牢固','通訊線路連接正確','各逆變器資料回傳正常','電表資料讀取正常','網路連線正常','遠端平台可正確顯示','告警設定已完成']],
+    ['併接工程',['台電端接線相序正確','保護電驛設定值符合細協','併接開關操作正常','計量設備安裝完成','併聯測試紀錄完整']],
+  ].map(([short,items])=>({
+    id:'sic-'+short, name:'自主檢查表 - '+short, group:'自主檢查', icon:'✅',
+    fields:[{k:'date',l:'檢查日期',t:'date',req:1},
+            {k:'area',l:'檢查區域／範圍',t:'text',req:1},
+            {k:'by',l:'檢查人員',t:'text',req:1},
+            {k:'witness',l:'會同人員',t:'text'}],
+    items})),
+];
+
+/* =========================== 資料層 =========================== */
+const KEY='gs_pm_db_v3';
+let DB = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw) return migrate(JSON.parse(raw));
+    const old = localStorage.getItem('gs_pm_db_v2');
+    if(old) return migrate(JSON.parse(old));
+  }catch(e){ console.warn('讀取失敗，改用預設資料',e); }
+  return seed();
+}
+let CAN_SAVE=true;
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(DB,(k,v)=>k.startsWith('_')?undefined:v));
+    if(!CAN_SAVE){ CAN_SAVE=true; const b=$('#nosave'); if(b) b.remove(); }
+  }catch(e){
+    if(CAN_SAVE){ CAN_SAVE=false; warnNoSave(); }
+  }
+}
+/** 這個環境不能存檔時，明確告知，免得白做工 */
+function warnNoSave(){
+  if(document.readyState==='loading'){ addEventListener('DOMContentLoaded',warnNoSave); return; }
+  if($('#nosave')) return;
+  const d=document.createElement('div');
+  d.id='nosave'; d.className='nosave';
+  d.innerHTML=`⚠ 這個開啟方式無法存檔，離開後資料會消失。請把檔案存到電腦後，用
+    <b>Chrome 或 Edge 直接開啟</b>（點兩下），或先用左下角「資料 → 匯出 JSON」留存。
+    <button onclick="this.parentElement.remove()">知道了</button>`;
+  document.body.appendChild(d);
+}
+function uid(){ return Math.random().toString(36).slice(2,10); }
+
+/** 補齊舊版缺少的欄位 */
+function migrate(db){
+  if(!db.formTpls||!db.formTpls.length) db.formTpls=JSON.parse(JSON.stringify(FORM_TEMPLATES));
+  (db.projects||[]).forEach(p=>{
+    p.calendarMode = p.calendarMode || 'cal';
+    p.members = p.members || [];
+    p.forms = p.forms || [];
+    (p.tasks||[]).forEach(t=>{
+      if(t.weight==null) t.weight = STAGE_WEIGHT[t.code] ?? 10;
+      if(!t.model) t.model = /^收款/.test(t.name) ? '開工法' : '比例法';
+      if(!t.logs) t.logs = [];
+      if(t.exec==null) t.exec='';
+      if(t.ms==null) t.ms = /收款|會議|檢查點|驗收|掛表|複驗/.test(t.name);
+      if(t.planStart==null) t.planStart='';
+      if(t.planEnd==null) t.planEnd='';
+      if(t.actEnd==null) t.actEnd='';
+      if(t.expEnd==null) t.expEnd='';
+      if(t.hours==null) t.hours='';
+    });
+    (p.files||[]).forEach(f=>{
+      if(f.task==null) f.task='';
+      if(!f.cat) f.cat = f.task?'任務相關':'專案基本資料相關';
+    });
+  });
+  db.ver=3; return db;
+}
+
+function parseTemplate(){
+  return EPC_TEMPLATE.split('\n').map(l=>{
+    const [code,name,dur,deps]=l.split('|');
+    const c=code.trim(), nm=name.trim();
+    return {code:c, name:nm, dur:dur?+dur||0:0, deps:(deps||'').trim(),
+            weight:STAGE_WEIGHT[c] ?? 10,
+            model:/^收款/.test(nm)?'開工法':'比例法',
+            ms:/收款|會議|檢查點|驗收|掛表|複驗/.test(nm),
+            owner:'', exec:'', hours:'',
+            planStart:'', planEnd:'', actStart:'', actEnd:'', expEnd:'',
+            prog:0, note:'', logs:[]};
+  });
+}
+function cloneFolders(list,out=[],parent=''){
+  list.forEach(f=>{ out.push({id:f.id,name:f.name,parent}); if(f.children) cloneFolders(f.children,out,f.id); });
+  return out;
+}
+function blankProject(o={}){
+  return Object.assign({
+    id:uid(), code:'', name:'新專案', status:'規劃中', secret:'授權', owner:'', category:'太陽光電',
+    customer:'', capacity:'', essCapacity:'', site:'', pvCode:'', genType:'自發自用',
+    meterDate:'', start:today(), due:'', star:false, note:'',
+    tasks:parseTemplate(), folders:cloneFolders(FOLDER_TEMPLATE), files:[], forms:[],
+    members:[], calendarMode:'cal', created:Date.now()
+  },o);
+}
+function seed(){
+  const p1=blankProject({code:'DEMO-001',name:'範例_安平科技屋頂型太陽光電',status:'進行中',
+    owner:'王小明',customer:'範例科技',capacity:'348.48',site:'台南市安平區（示範資料）',
+    pvCode:'',genType:'自發自用',meterDate:'2026-01-15',start:'2025-10-20'});
+  const p2=blankProject({code:'DEMO-002',name:'範例_儲能系統建置承攬工程',status:'進行中',
+    owner:'王小明',category:'儲能',customer:'範例能源',essCapacity:'2000',site:'台南市學甲區（示範資料）',
+    start:'2025-09-01',due:'2026-03-31'});
+  const p3=blankProject({code:'DEMO-003',name:'範例_維運案件進度',status:'進行中',
+    owner:'李大華',category:'維運',start:'2026-01-01',due:'2026-12-31'});
+
+  // 示範資料：一開啟就看得到實際 vs 預定的落差
+  const set=(code,o)=>{ const t=p1.tasks.find(x=>x.code===code); if(t) Object.assign(t,o); };
+  p1.tasks.forEach(t=>{ if(/^1(\.|$)|^2(\.|$)/.test(t.code)) t.prog=100; });
+  set('1.2',{owner:'張志豪',actStart:'2025-10-16',actEnd:'2025-10-17'});
+  set('3.1',{owner:'陳美玲',prog:100,actStart:'2025-10-20',actEnd:'2025-11-18',
+    logs:[{ts:'2025-11-18',who:'陳美玲',text:'客戶資料 10/28 提供，11/5 初步整理完成，11/14 收到技師機電圖說及簽證，11/18 送客戶用印。'}]});
+  set('3.2',{owner:'陳美玲',prog:100,actStart:'2025-11-19',actEnd:'2026-01-15',
+    logs:[{ts:'2026-01-15',who:'陳美玲',text:'11/19 台電送審，12/12 台電現勘，配電場所技師改圖 1/2 送件，規劃課審驗中，1/15 取得。'}]});
+  set('3.3',{owner:'李大華',prog:100,actStart:'2026-01-19',actEnd:'2026-03-18'});
+  set('3.4',{owner:'李大華',prog:100,actStart:'2026-03-18',actEnd:'2026-06-10'});
+  set('3.5',{owner:'李大華',prog:100,actStart:'2026-03-26',actEnd:'2026-04-21'});
+  set('3.6',{owner:'李大華',prog:40,actStart:'2026-06-12',expEnd:'2026-10-30',
+    logs:[{ts:'2026-08-11',who:'李大華',text:'台電承辦同意發修正函，8/11 取得轉供自用初協。'},
+          {ts:'2026-09-16',who:'李大華',text:'同備已核准，預計 9/18 收到後至台電辦理變更，預計十月底取得。'}]});
+  set('3.9',{owner:'李大華',prog:100,actStart:'2026-05-15',actEnd:'2026-06-26'});
+  set('4.1',{owner:'林佳蓉',prog:100,actStart:'2025-10-21',actEnd:'2025-10-31'});
+  set('4.2.1',{owner:'林佳蓉',prog:100,actStart:'2025-10-22',actEnd:'2026-03-20',
+    logs:[{ts:'2026-03-20',who:'林佳蓉',text:'因應新法規暫緩出貨，2/13 報告確認架構無法符合，法規修正後取消壓板，3/20 模組到貨。'}]});
+  set('4.2.2',{owner:'林佳蓉',prog:100,actStart:'2025-10-22',actEnd:'2026-03-05'});
+  set('4.2.3',{owner:'林佳蓉',prog:100,actStart:'2025-10-22',actEnd:'2026-01-14'});
+  set('4.2.4',{owner:'林佳蓉',prog:100,actStart:'2025-10-22',actEnd:'2025-11-22'});
+  set('4.2.6',{owner:'林佳蓉',prog:100,actStart:'2026-04-10',actEnd:'2026-05-18'});
+  set('4.3',{owner:'林佳蓉',prog:100,actStart:'2025-11-27',actEnd:'2025-12-29'});
+  set('5.1.1',{owner:'黃建國',prog:100,actStart:'2025-06-25',actEnd:'2025-06-25'});
+  set('5.1.2',{owner:'黃建國',prog:100,actStart:'2025-06-25',actEnd:'2025-06-25'});
+  set('5.2.2',{owner:'黃建國',prog:100,actStart:'2025-12-27',actEnd:'2026-03-25',
+    logs:[{ts:'2026-03-25',who:'黃建國',text:'1/30 腳座施工 100%、步道施工 100%；3/25 支架安裝 100%。'}]});
+  set('5.2.3',{owner:'黃建國',prog:100,actStart:'2025-11-07',actEnd:'2025-11-22'});
+  set('5.2.4',{owner:'黃建國',prog:100,actStart:'2026-03-26',actEnd:'2026-04-01'});
+  set('5.2.5',{owner:'黃建國',prog:100,actStart:'2026-01-21',actEnd:'2026-04-17'});
+  set('5.2.6',{owner:'黃建國',prog:70,actStart:'2026-03-20'});
+  set('5.2.13',{owner:'黃建國',prog:100,actStart:'2026-01-24',actEnd:'2026-05-20'});
+  set('5.2.12',{owner:'黃建國',prog:30,actStart:'2026-08-01'});
+
+  p1.files=[
+    {id:uid(),folder:'1000',cat:'專案基本資料相關',task:'',name:'案場現勘照片.zip',no:'GS-1000-001',type:'zip',flowOwner:'張志豪',flow:'已歸檔',url:'',mt:Date.now()-86400000*300},
+    {id:uid(),folder:'3100',cat:'任務相關',task:'3.1',name:'客戶土地使用同意書.pdf',no:'GS-3100-001',type:'pdf',flowOwner:'陳美玲',flow:'已核准',url:'',mt:Date.now()-86400000*280},
+    {id:uid(),folder:'3300',cat:'任務相關',task:'3.2',name:'台電併聯審查意見書.pdf',no:'GS-3300-001',type:'pdf',flowOwner:'陳美玲',flow:'已核准',url:'',mt:Date.now()-86400000*240},
+    {id:uid(),folder:'3200',cat:'任務相關',task:'3.6',name:'轉供自用修正函_送審版.pdf',no:'GS-3200-001',type:'pdf',flowOwner:'李大華',flow:'審核中',url:'',mt:Date.now()-86400000*3},
+    {id:uid(),folder:'2100',cat:'任務相關',task:'2.1',name:'系統配置圖_v3.dwg',no:'GS-2100-001',type:'dwg',flowOwner:'周怡君',flow:'已核准',url:'',mt:Date.now()-86400000*300},
+  ];
+  p1.members=[{name:'王小明',role:'專案主持人',dept:'專案管理部'},{name:'李大華',role:'管理人員',dept:'專案管理部'},
+              {name:'周怡君',role:'工作人員',dept:'工程設計部'},{name:'黃建國',role:'工作人員',dept:'工程管理部'},
+              {name:'林佳蓉',role:'工作人員',dept:'採購部'}];
+  p1.forms=[
+    {id:uid(),tpl:'log-daily',task:'5.2.12',status:'已送出',no:'F-0001',by:'黃建國',at:Date.now()-86400000*2,
+     data:{date:fmt(addDays(new Date(),-2)),weather:'晴',crewOwn:'2',crewSub:'4',
+       work:'監控設備安裝：主機上架、通訊線配管',qty:'主機安裝完成，通訊線約 60%',
+       machine:'高空作業車 1 台',issue:'下午陣雨暫停 1 小時',next:'完成通訊線並測試回傳',by:'黃建國'},checks:{}},
+    {id:uid(),tpl:'sic-模組安裝',task:'5.2.4',status:'已核准',no:'F-0002',by:'周怡君',at:Date.now()-86400000*170,
+     data:{date:'2026-04-01',area:'屋頂 A、B 區',by:'周怡君',witness:'黃建國'},
+     checks:{0:{r:'ok',note:''},1:{r:'ok',note:''},2:{r:'ok',note:'扭力 18N·m 已標記'},
+             3:{r:'ok',note:''},4:{r:'ok',note:''},5:{r:'ok',note:''},6:{r:'ok',note:''}}},
+    {id:uid(),tpl:'iqc-模組',task:'4.2.1',status:'已核准',no:'F-0003',by:'林佳蓉',at:Date.now()-86400000*180,
+     data:{date:'2026-03-20',vendor:'範例模組廠',spec:'PV模組 540W',qty:'648 片',lot:'SO-2603-118',by:'林佳蓉'},
+     checks:{0:{r:'ok',note:''},1:{r:'ok',note:''},2:{r:'ok',note:''},3:{r:'ok',note:''},
+             4:{r:'ok',note:''},5:{r:'ok',note:''},6:{r:'ng',note:'缺 20 片，廠商補出貨'}}},
+  ];
+  return {projects:[p1,p2,p3], settings:{theme:'light'},
+          formTpls:JSON.parse(JSON.stringify(FORM_TEMPLATES)), ver:3};
+}
+
+/* =========================== 日期工具 =========================== */
+function today(){ return fmt(new Date()); }
+function todayD(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function fmt(d){ if(!d) return ''; const p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function D(s){ if(!s) return null; const [y,m,d]=String(s).split('-').map(Number);
+  if(!y||!m||!d) return null; return new Date(y,m-1,d); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function isWE(d){ const w=d.getDay(); return w===0||w===6; }
+function shift(d,n,mode){
+  if(mode!=='work') return addDays(d,n);
+  let x=new Date(d), step=n>=0?1:-1, left=Math.abs(n);
+  while(left>0){ x=addDays(x,step); if(!isWE(x)) left--; }
+  return x;
+}
+function snapFwd(d,mode){ let x=new Date(d); if(mode==='work') while(isWE(x)) x=addDays(x,1); return x; }
+function diffDays(a,b){ return Math.round((b-a)/86400000); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* =========================== 排程引擎 =========================== */
+/**
+ * 預定（baseline）日期：有手動填 planStart/planEnd 就用手填的，
+ * 否則依 WBS 前置任務語法 {code}{FS|SS|FF|SF}{lag} 自動推算。
+ * 摘要任務的起迄由子項彙總。
+ */
+function schedule(p){
+  const mode=p.calendarMode||'cal';
+  const base=snapFwd(D(p.start)||new Date(), mode);
+  const map={}, kids={};
+  p.tasks.forEach(t=>map[t.code]=t);
+  p.tasks.forEach(t=>{ const i=t.code.lastIndexOf('.');
+    if(i>0){ const pa=t.code.slice(0,i); if(map[pa]) (kids[pa]=kids[pa]||[]).push(t.code); } });
+  const isSum=c=>!!kids[c];
+  const memo={}, visiting={};
+
+  function calc(code){
+    if(memo[code]) return memo[code];
+    const t=map[code];
+    if(!t) return {s:base,e:base};
+    if(visiting[code]) return {s:base,e:base};          // 防循環相依
+    visiting[code]=true;
+    let r;
+    if(isSum(code)){
+      const cs=kids[code].map(calc);
+      r={s:new Date(Math.min(...cs.map(x=>+x.s))), e:new Date(Math.max(...cs.map(x=>+x.e)))};
+    }else if(t.planStart && t.planEnd){
+      r={s:D(t.planStart), e:D(t.planEnd)};
+    }else{
+      const dur=Math.max(1,t.dur||1);
+      let s=t.planStart?D(t.planStart):base;
+      if(!t.planStart && t.deps){
+        t.deps.split(',').map(x=>x.trim()).filter(Boolean).forEach(dep=>{
+          const m=dep.match(/^([\d.]+)(FS|SS|FF|SF)(-?\d+)$/i);
+          if(!m||!map[m[1]]) return;
+          const pr=calc(m[1]), ty=m[2].toUpperCase(), lag=+m[3];
+          let cand;
+          if(ty==='FS')      cand=shift(pr.e, 1+lag, mode);
+          else if(ty==='SS') cand=shift(pr.s, lag, mode);
+          else if(ty==='FF') cand=shift(shift(pr.e, lag, mode), -(dur-1), mode);
+          else               cand=shift(shift(pr.s, lag, mode), -(dur-1), mode);
+          if(cand>s) s=cand;
+        });
+      }
+      s=snapFwd(s,mode);
+      r={s, e:shift(s,dur-1,mode)};
+    }
+    delete visiting[code];
+    return memo[code]=r;
+  }
+
+  p.tasks.forEach(t=>{
+    const r=calc(t.code);
+    t._s=r.s; t._e=r.e; t._sum=isSum(t.code);
+    t._as=D(t.actStart); t._ae=D(t.actEnd);
+    t._ee=D(t.expEnd)||t._ae||null;                     // 預期完成：沒填就用實際完成
+  });
+
+  function leaves(code){
+    const out=[];
+    (function walk(c){ if(kids[c]) kids[c].forEach(walk); else if(map[c]) out.push(map[c]); })(code);
+    return out;
+  }
+  // 摘要任務的實際/預期日期由子項彙總
+  p.tasks.filter(t=>t._sum).forEach(t=>{
+    const lv=leaves(t.code);
+    const as=lv.map(x=>x._as).filter(Boolean),
+          ae=lv.map(x=>x._ae).filter(Boolean),
+          ee=lv.map(x=>x._ee||x._e).filter(Boolean);
+    t._as = as.length?new Date(Math.min(...as)):null;
+    t._ae = (lv.length&&ae.length===lv.length)?new Date(Math.max(...ae)):null;
+    t._ee = ee.length?new Date(Math.max(...ee)):null;
+  });
+
+  // 反推最晚完成 → 浮時 / 要徑
+  const succ={};
+  p.tasks.forEach(t=>{ if(!t.deps) return;
+    t.deps.split(',').map(x=>x.trim()).filter(Boolean).forEach(dep=>{
+      const m=dep.match(/^([\d.]+)(FS|SS|FF|SF)(-?\d+)$/i); if(!m) return;
+      (succ[m[1]]=succ[m[1]]||[]).push({to:t.code,ty:m[2].toUpperCase(),lag:+m[3]});
+    });
+  });
+  const projEnd=new Date(Math.max(...p.tasks.map(t=>+t._e)));
+  const lf={};
+  function lateF(code){
+    if(lf[code]) return lf[code];
+    lf[code]=projEnd;                                    // 先佔位防循環
+    const t=map[code];
+    let v=projEnd;
+    (succ[code]||[]).forEach(s=>{
+      const st=map[s.to]; if(!st) return;
+      const sLF=lateF(s.to), sLS=shift(sLF, -(Math.max(1,st.dur||1)-1), mode);
+      let c;
+      if(s.ty==='FS')      c=shift(sLS, -(1+s.lag), mode);
+      else if(s.ty==='SS') c=shift(shift(sLS, -s.lag, mode), Math.max(1,(t.dur||1))-1, mode);
+      else                 c=shift(sLF, -s.lag, mode);
+      if(c<v) v=c;
+    });
+    return lf[code]=v;
+  }
+  p.tasks.forEach(t=>{
+    if(t._sum){ t._float=0; t._crit=false; return; }
+    t._float=diffDays(t._e, lateF(t.code)); t._crit=t._float<=0;
+  });
+
+  p._map=map; p._kids=kids;
+  p._roots=p.tasks.filter(t=>!t.code.includes('.')).map(t=>t.code);
+  p._start=new Date(Math.min(...p.tasks.map(t=>+t._s)));
+  p._end=projEnd;
+  p._fcEnd=new Date(Math.max(...p.tasks.map(t=>+(t._ee||t._e))));   // 預期完工
+
+  // 進度（依權重彙總）
+  const n=todayD();
+  p.tasks.forEach(t=>{
+    t._prog=rollAt(p,t.code,x=>x.prog||0);
+    t._plan=rollAt(p,t.code,x=>plannedOf(x,n));
+  });
+  p._prog=rollAll(p,x=>x.prog||0);
+  p._plan=rollAll(p,x=>plannedOf(x,n));
+  return p;
+}
+
+/** 權重彙總：葉節點取 fn(task)，父節點用子項權重加權平均 */
+function rollAt(p,code,fn){
+  const k=p._kids[code];
+  if(!k||!k.length) return fn(p._map[code])||0;
+  let w=0,s=0;
+  k.forEach(c=>{ const t=p._map[c], ww=Math.max(0,+t.weight||0); w+=ww; s+=ww*rollAt(p,c,fn); });
+  return w? s/w : 0;
+}
+function rollAll(p,fn){
+  let w=0,s=0;
+  p._roots.forEach(c=>{ const t=p._map[c], ww=Math.max(0,+t.weight||0); w+=ww; s+=ww*rollAt(p,c,fn); });
+  return w? s/w : 0;
+}
+/** 預定進度：到某日為止「照計畫」應該完成多少 */
+function plannedOf(t,d){
+  if(!t||!t._s||!t._e) return 0;
+  if(t.model==='開工法') return d>=t._s?100:0;
+  if(d<t._s) return 0;
+  if(d>=t._e) return 100;
+  return clamp((diffDays(t._s,d)+1)/(diffDays(t._s,t._e)+1)*100,0,100);
+}
+/** 實際進度回推到某日（供 S 曲線用） */
+function actualOf(t,d){
+  if(!t) return 0;
+  if(t._ae && d>=t._ae) return t.prog||100;
+  if(!t._as || d<t._as) return 0;
+  const n=todayD();
+  if(d>=n || t.model==='開工法') return t.prog||0;
+  const end=t._ee||t._e;
+  const span=Math.max(1,diffDays(t._as,end)+1);
+  return clamp((diffDays(t._as,d)+1)/span*100, 0, t.prog||0);
+}
+
+function taskStatus(t){
+  const n=todayD();
+  if((t._prog||0)>=99.5) return {k:'已完成',c:'ok'};
+  const due=t._ee||t._e;
+  if(due&&due<n) return {k:'逾期',c:'late'};
+  if((t._prog||0)>0) return {k:'進行中',c:'run'};
+  if(t._s&&t._s<=n) return {k:'應開始',c:'warn'};
+  return {k:'未開始',c:''};
+}
+/** 進度偏差：實際 − 預定，負數代表落後 */
+function variance(t){ return (t._prog||0)-(t._plan||0); }
+
+/* =========================== 路由 =========================== */
+let route={view:'projects',id:null,tab:'overview'};
+let SEARCH='';
+let CURHASH='#/projects';
+/**
+ * 直接切換畫面，不等 hashchange。
+ * 有些開啟方式（沙箱預覽、某些 file:// 情境）改不了 location.hash，
+ * 只靠 hashchange 會整個點不動，所以這裡自己記狀態、自己重畫。
+ */
+function go(h){
+  CURHASH=h;
+  if(location.hash!==h){ try{ location.hash=h; }catch(e){} }
+  const s=$('#side'); if(s&&s.classList.contains('open')) toggleSide();   // 窄螢幕點完自動收起
+  parseHash(); render();
+}
+function parseHash(){
+  const h=(CURHASH||'#/projects').slice(2).split('/');
+  if(h[0]==='p'&&h[1]) route={view:'project',id:h[1],tab:h[2]||'overview'};
+  else if(h[0]==='star') route={view:'projects',star:true};
+  else if(h[0]==='tasks') route={view:'mytasks'};
+  else if(h[0]==='files') route={view:'allfiles'};
+  else route={view:'projects'};
+}
+/** 只處理「使用者按上一頁／直接改網址」造成的變動，自己按的分頁已經畫過了 */
+window.addEventListener('hashchange',()=>{
+  if(location.hash && location.hash.startsWith('#/') && location.hash!==CURHASH){
+    CURHASH=location.hash; parseHash(); render();
+  }
+});
+
+/* =========================== 畫面 =========================== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=v=>(Math.round((v||0)*10)/10).toFixed(1);
+const vcol=v=>v<-5?'var(--danger)':v>=0?'var(--ok)':'var(--warn)';
+
+function render(){
+  DB.projects.forEach(schedule);
+  renderNav(); renderCrumb(); renderTabs();
+  const v=$('#view');
+  if(route.view==='projects') v.innerHTML=viewProjects();
+  else if(route.view==='mytasks') v.innerHTML=viewMyTasks();
+  else if(route.view==='allfiles') v.innerHTML=viewAllFiles();
+  else{
+    const p=proj(); if(!p){ go('#/projects'); return; }
+    v.innerHTML=({overview:viewOverview,schedule:viewSchedule,gantt:viewGantt,
+                  docs:viewDocs,forms:viewForms,team:viewTeam}[route.tab]||viewOverview)(p);
+    if(route.tab==='gantt') syncGantt();
+    if(route.tab==='docs') bindDrop(p);
+  }
+}
+function proj(){ return DB.projects.find(x=>x.id===route.id); }
+
+function renderNav(){
+  const st=DB.projects.filter(p=>p.star).length;
+  $('#nav').innerHTML=`
+    <div class="nav-label">專案管理</div>
+    <a class="${route.view==='projects'&&!route.star?'on':''}" onclick="go('#/projects')"><span class="ic">▤</span>專案總表<span class="cnt">${DB.projects.length}</span></a>
+    <a class="${route.star?'on':''}" onclick="go('#/star')"><span class="ic">★</span>常用專案<span class="cnt">${st}</span></a>
+    <a class="${route.view==='mytasks'?'on':''}" onclick="go('#/tasks')"><span class="ic">◷</span>近期待辦</a>
+    <a class="${route.view==='allfiles'?'on':''}" onclick="go('#/files')"><span class="ic">🗎</span>全部文件</a>
+    <div class="nav-label">進行中專案</div>
+    ${DB.projects.filter(p=>p.status==='進行中').slice(0,8).map(p=>`
+      <a class="${route.id===p.id?'on':''}" onclick="go('#/p/${p.id}/overview')" title="${esc(p.name)}">
+        <span class="ic">●</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>
+      </a>`).join('')}`;
+}
+function renderCrumb(){
+  const p=route.view==='project'?proj():null;
+  const t={overview:'總覽',schedule:'進度排程',gantt:'甘特圖',docs:'文件',forms:'表單',team:'成員與設定'}[route.tab]||'';
+  $('#crumb').innerHTML = p
+    ? `<span>專案管理</span><span class="sep">›</span><b>${esc(p.name)}</b><span class="sep">›</span><span>${t}</span>`
+    : `<span>專案管理</span><span class="sep">›</span><b>${route.view==='mytasks'?'近期待辦':route.view==='allfiles'?'全部文件':route.star?'常用專案':'專案總表'}</b>`;
+}
+function renderTabs(){
+  if(route.view!=='project'){ $('#tabs').innerHTML=''; return; }
+  const tabs=[['overview','總覽'],['schedule','進度排程'],['gantt','甘特圖'],['docs','文件'],['forms','表單'],['team','成員與設定']];
+  $('#tabs').innerHTML=`<div class="tabs">${tabs.map(([k,l])=>
+    `<a class="${route.tab===k?'on':''}" onclick="go('#/p/${route.id}/${k}')">${l}</a>`).join('')}</div>`;
+}
+function kpi(lb,vl,sub,cls){ return `<div class="kpi ${cls||''}"><div class="lb">${lb}</div><div class="vl">${vl}</div><div class="sub">${sub}</div></div>`; }
+/** 實際進度條，灰色游標標示預定進度位置 */
+function dualBar(prog,plan,w){
+  const v=prog-plan;
+  return `<div class="bar ${v<-5?'late':''}" style="${w?`width:${w}px`:'flex:1'}" title="實際 ${pct(prog)}%／預定 ${pct(plan)}%">
+    <i style="width:${clamp(prog,0,100)}%"></i><b style="left:${clamp(plan,0,99.5)}%"></b></div>`;
+}
+
+/* ---------- 專案總表 ---------- */
+let filt={status:'',secret:'',owner:''};
+function viewProjects(){
+  let list=DB.projects.slice();
+  if(route.star) list=list.filter(p=>p.star);
+  if(filt.status) list=list.filter(p=>p.status===filt.status);
+  if(filt.secret) list=list.filter(p=>p.secret===filt.secret);
+  if(filt.owner) list=list.filter(p=>p.owner===filt.owner);
+  if(SEARCH) list=list.filter(p=>(p.name+p.code+p.customer+p.site).toLowerCase().includes(SEARCH));
+  list.sort((a,b)=>(b.star?1:0)-(a.star?1:0)||(b.created||0)-(a.created||0));
+  const owners=[...new Set(DB.projects.map(p=>p.owner).filter(Boolean))];
+  const behind=DB.projects.filter(p=>p._prog-p._plan<-5).length;
+  const files=DB.projects.reduce((a,p)=>a+p.files.length,0);
+
+  return `
+  <div class="kpis" style="margin-bottom:16px">
+    ${kpi('專案總數',DB.projects.length,'含已結案')}
+    ${kpi('進行中',DB.projects.filter(p=>p.status==='進行中').length,'狀態為進行中')}
+    ${kpi('進度落後',behind,behind?'落後預定 5% 以上':'全數符合預定進度',behind?'bad':'good')}
+    ${kpi('文件總數',files,'所有專案')}
+  </div>
+  <div class="filters">
+    <select onchange="filt.status=this.value;render()"><option value="">全部狀態</option>
+      ${PROJ_STATUS.map(s=>`<option ${filt.status===s?'selected':''}>${s}</option>`).join('')}</select>
+    <select onchange="filt.secret=this.value;render()"><option value="">全部機密等級</option>
+      ${SECRET_LV.map(s=>`<option ${filt.secret===s?'selected':''}>${s}</option>`).join('')}</select>
+    <select onchange="filt.owner=this.value;render()"><option value="">全部主持人</option>
+      ${owners.map(s=>`<option ${filt.owner===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+    ${(filt.status||filt.secret||filt.owner)?`<button class="btn sm gh" onclick="filt={status:'',secret:'',owner:''};render()">清除篩選</button>`:''}
+    <div style="flex:1"></div><span class="muted" style="font-size:12.5px">共 ${list.length} 筆</span>
+  </div>
+  <div class="card" style="overflow:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th style="width:44px"></th><th>專案名稱</th><th style="width:92px">專案代號</th><th style="width:80px">狀態</th>
+        <th style="width:148px">實際 / 預定進度</th><th style="width:66px">偏差</th>
+        <th style="width:104px">預定開始</th><th style="width:104px">預期完工</th>
+        <th style="width:84px">類別</th><th style="width:150px">專案主持人</th><th style="width:62px"></th>
+      </tr></thead>
+      <tbody>${list.length?list.map(p=>{
+        const v=p._prog-p._plan;
+        return `<tr>
+          <td><span class="star ${p.star?'on':''}" onclick="toggleStar('${p.id}')">${p.star?'★':'☆'}</span></td>
+          <td><span class="link" onclick="go('#/p/${p.id}/overview')">${esc(p.name)}</span></td>
+          <td class="num muted">${esc(p.code||'—')}</td>
+          <td><span class="pill ${p.status==='進行中'?'run':(p.status==='已結案'||p.status==='已完工')?'ok':p.status==='暫停'?'warn':''}">${p.status}</span></td>
+          <td><div style="display:flex;align-items:center;gap:8px">${dualBar(p._prog,p._plan,70)}
+            <span class="num muted" style="font-size:12px">${pct(p._prog)}%</span></div></td>
+          <td class="num" style="color:${vcol(v)};font-weight:600;font-size:12.5px">${v>=0?'+':''}${pct(v)}%</td>
+          <td class="num muted">${p.start||'—'}</td>
+          <td class="num muted">${p._fcEnd?fmt(p._fcEnd):'—'}</td>
+          <td class="muted">${esc(p.category||'—')}</td>
+          <td>${esc(p.owner||'—')}</td>
+          <td><button class="btn sm gh" onclick="editProject('${p.id}')">編輯</button></td>
+        </tr>`;}).join(''):`<tr><td colspan="11"><div class="empty"><div class="big">▤</div>沒有符合條件的專案</div></td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* ---------- 總覽（含 S 曲線） ---------- */
+function viewOverview(p){
+  const v=p._prog-p._plan;
+  const leaves=p.tasks.filter(t=>!t._sum);
+  const done=leaves.filter(t=>(t.prog||0)>=100).length;
+  const late=leaves.filter(t=>taskStatus(t).k==='逾期');
+  const delay=diffDays(p._end,p._fcEnd);
+  const stages=p.tasks.filter(t=>/^\d+$/.test(t.code));
+  const pays=p.tasks.filter(t=>t.name.startsWith('收款：'));
+  const recent=[];
+  p.tasks.forEach(t=>(t.logs||[]).forEach(l=>recent.push({t,l})));
+  recent.sort((a,b)=>String(b.l.ts).localeCompare(String(a.l.ts)));
+
+  return `
+  <div class="kpis" style="margin-bottom:16px">
+    ${kpi('實際進度',pct(p._prog)+'%',`預定應達 ${pct(p._plan)}%`)}
+    ${kpi('進度偏差',(v>=0?'+':'')+pct(v)+'%',v<-5?'落後，需檢討':v<0?'略為落後':'符合或超前',v<-5?'bad':v>=0?'good':'')}
+    ${kpi('預期完工',fmt(p._fcEnd),delay>0?`較預定晚 ${delay} 天`:delay<0?`較預定早 ${-delay} 天`:'與預定相同',delay>0?'bad':'')}
+    ${kpi('逾期任務',late.length,`${done}/${leaves.length} 項已完成`,late.length?'bad':'good')}
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-h"><h3>專案進度 S 曲線</h3><div class="sp"></div>
+      <span class="pill"><span class="dot" style="color:var(--plan)"></span>預定</span>
+      <span class="pill"><span class="dot" style="color:var(--brand)"></span>實際</span></div>
+    <div style="padding:14px 16px 8px">${sCurve(p)}</div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1.4fr 1fr">
+    <div class="card">
+      <div class="card-h"><h3>各階段進度</h3><div class="sp"></div>
+        <span class="muted" style="font-size:12px">權重合計 ${stages.reduce((a,s)=>a+(+s.weight||0),0)}</span>
+        <button class="btn sm" onclick="go('#/p/${p.id}/gantt')">甘特圖 →</button></div>
+      <div style="padding:6px 16px 14px">
+        ${stages.map(s=>{const sv=s._prog-s._plan;return `
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2)">
+            <span style="width:92px;font-weight:600">${esc(s.name)}</span>
+            <span class="tag" title="權重">${s.weight}</span>
+            ${dualBar(s._prog,s._plan)}
+            <span class="num muted" style="width:46px;text-align:right;font-size:12.5px">${pct(s._prog)}%</span>
+            <span class="num" style="width:50px;text-align:right;font-size:12px;font-weight:600;color:${vcol(sv)}">${sv>=0?'+':''}${pct(sv)}</span>
+          </div>`;}).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>案場資訊</h3><div class="sp"></div>
+        <button class="btn sm gh" onclick="editProject('${p.id}')">編輯</button></div>
+      <div style="padding:14px 16px">
+        ${info('專案代號',p.code)}${info('客戶',p.customer)}${info('案件地點',p.site)}
+        ${info('光電設置容量',p.capacity?p.capacity+' kW':'')}${info('儲能設置容量',p.essCapacity?p.essCapacity+' kW':'')}
+        ${info('發電類型',p.genType)}${info('PV 編碼',p.pvCode)}${info('預定掛表日',p.meterDate)}
+        ${info('專案主持人',p.owner)}${info('工期基準',p.calendarMode==='work'?'工作日':'日曆日')}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+    <div class="card">
+      <div class="card-h"><h3>最新進度日誌</h3><span class="pill">${recent.length}</span></div>
+      ${recent.length?`<div style="padding:16px 18px"><div class="log">${recent.slice(0,6).map(({t,l})=>`
+        <div class="it"><div class="mt">${esc(l.ts)}　<span class="link" onclick="editTask('${p.id}','${t.code}')">${t.code} ${esc(t.name)}</span>${l.who?'　'+esc(l.who):''}</div>
+        <div class="bd">${esc(l.text)}</div></div>`).join('')}</div></div>`
+      :`<div class="empty">還沒有任何進度日誌</div>`}
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>收款里程碑</h3></div>
+      ${pays.length?`<div style="max-height:320px;overflow:auto"><table class="tbl"><tbody>${pays.map(t=>`
+        <tr><td>${esc(t.name.replace('收款：',''))}</td>
+            <td class="num muted" style="width:96px">${fmt(t._s)}</td>
+            <td style="width:80px"><span class="pill ${(t.prog||0)>=100?'ok':''}">${(t.prog||0)>=100?'已收款':'未收款'}</span></td>
+            <td style="width:64px"><button class="btn sm gh" onclick="togglePay('${p.id}','${t.code}')">${(t.prog||0)>=100?'取消':'標記'}</button></td>
+        </tr>`).join('')}</tbody></table></div>`:`<div class="empty">無收款項目</div>`}
+    </div>
+  </div>`;
+}
+function info(k,v){ return `<div style="display:flex;padding:5px 0;font-size:13px">
+  <span class="muted" style="width:100px;flex:0 0 100px">${k}</span><span>${esc(v||'—')}</span></div>`; }
+
+/** S 曲線：每週取樣，預定虛線、實際實線（只畫到今天） */
+function sCurve(p){
+  const W=980,H=210,PL=38,PR=14,PT=12,PB=26;
+  const s=p._start, e=new Date(Math.max(+p._end,+p._fcEnd));
+  const days=Math.max(1,diffDays(s,e));
+  const n=todayD(), pts=[];
+  for(let i=0;i<=days;i+=7){
+    const d=addDays(s,i);
+    pts.push({d,plan:rollAll(p,t=>plannedOf(t,d)),act:d<=n?rollAll(p,t=>actualOf(t,d)):null});
+  }
+  if(pts[pts.length-1].d<e) pts.push({d:e,plan:rollAll(p,t=>plannedOf(t,e)),act:e<=n?rollAll(p,t=>actualOf(t,e)):null});
+  const X=d=>PL+diffDays(s,d)/days*(W-PL-PR);
+  const Y=v=>PT+(1-v/100)*(H-PT-PB);
+  const line=key=>pts.filter(q=>q[key]!=null).map((q,i)=>(i?'L':'M')+X(q.d).toFixed(1)+' '+Y(q[key]).toFixed(1)).join(' ');
+  const months=[];
+  for(let i=0;i<=days;i++){ const d=addDays(s,i); if(d.getDate()===1||i===0) months.push(d); }
+  const nx=X(n), last=pts.filter(q=>q.act!=null).pop();
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:210px;display:block" preserveAspectRatio="none">
+    ${[0,25,50,75,100].map(v=>`
+      <line x1="${PL}" y1="${Y(v)}" x2="${W-PR}" y2="${Y(v)}" stroke="var(--line-2)" stroke-width="1"/>
+      <text x="${PL-6}" y="${Y(v)+4}" text-anchor="end" font-size="10" fill="var(--txt-3)">${v}%</text>`).join('')}
+    ${months.filter((d,i)=>months.length<16||i%2===0).map(d=>`
+      <text x="${X(d)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--txt-3)">${d.getMonth()+1}月</text>`).join('')}
+    ${n>=s&&n<=e?`<line x1="${nx}" y1="${PT}" x2="${nx}" y2="${H-PB}" stroke="var(--danger)" stroke-width="1.5" opacity=".55" stroke-dasharray="4 3"/>`:''}
+    <path d="${line('plan')}" fill="none" stroke="var(--plan)" stroke-width="2" stroke-dasharray="6 4"/>
+    <path d="${line('act')}" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${last?`<circle cx="${X(last.d)}" cy="${Y(last.act)}" r="4" fill="var(--brand)"/>`:''}
+  </svg>`;
+}
+
+/* ---------- 進度排程 ---------- */
+let showOnly='', dense=true;   // dense=精簡欄位，關掉才顯示權重/模型/工期/前置任務
+function viewSchedule(p){
+  let rows=p.tasks;
+  if(showOnly==='open') rows=rows.filter(t=>!t._sum&&(t.prog||0)<100);
+  else if(showOnly==='behind') rows=rows.filter(t=>!t._sum&&variance(t)<-5);
+  else if(showOnly==='late') rows=rows.filter(t=>!t._sum&&taskStatus(t).k==='逾期');
+  else if(showOnly==='crit') rows=rows.filter(t=>!t._sum&&t._crit);
+  if(SEARCH) rows=rows.filter(t=>(t.code+t.name).toLowerCase().includes(SEARCH));
+  return `
+  <div class="filters">
+    <div class="seg">
+      ${[['','全部'],['open','未完成'],['behind','落後'],['late','逾期'],['crit','要徑']].map(([k,l])=>
+        `<button class="${showOnly===k?'on':''}" onclick="showOnly='${k}';render()">${l}</button>`).join('')}
+    </div>
+    <select onchange="setMode('${p.id}',this.value)">
+      <option value="cal" ${p.calendarMode!=='work'?'selected':''}>工期以日曆日計</option>
+      <option value="work" ${p.calendarMode==='work'?'selected':''}>工期以工作日計（跳過週末）</option>
+    </select>
+    <div class="seg">
+      <button class="${dense?'on':''}" onclick="dense=true;render()">精簡欄位</button>
+      <button class="${dense?'':'on'}" onclick="dense=false;render()">完整欄位</button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn sm" onclick="addTask('${p.id}')">＋ 新增任務</button>
+    <button class="btn sm" onclick="exportCSV('${p.id}')">匯出 CSV</button>
+  </div>
+  <div class="card" style="overflow:auto;max-height:calc(100vh - 220px)">
+    <table class="tbl">
+      <thead><tr>
+        <th style="width:56px">編碼</th><th style="min-width:190px">任務名稱</th>
+        ${dense?'':`<th style="width:50px">權重</th><th style="width:62px">模型</th><th style="width:50px">工期</th>`}
+        <th style="width:112px">預定開始</th><th style="width:112px">預定完成</th>
+        ${dense?'':`<th style="width:112px">實際開始</th>`}
+        <th style="width:118px">實際/預期完成</th>
+        <th style="width:130px">實際 / 預定</th><th style="width:58px">偏差</th>
+        <th style="width:74px">狀態</th><th style="width:88px">負責人</th>
+        ${dense?'':`<th style="width:132px">前置任務</th>`}<th style="width:44px"></th>
+      </tr></thead>
+      <tbody>${rows.map(t=>{
+        const st=taskStatus(t), lv=(t.code.match(/\./g)||[]).length, vr=variance(t);
+        const endTxt=t._ae?fmt(t._ae):(t._ee?fmt(t._ee):'');
+        const lateEnd=t._ee&&!t._ae&&t._ee>t._e;
+        return `<tr style="${t._sum?'background:var(--panel-2)':''}">
+          <td class="num muted">${t.code}</td>
+          <td style="padding-left:${12+lv*16}px;${t._sum?'font-weight:700':''}">
+            <span class="${t._sum?'':'link'}" ${t._sum?'':`onclick="editTask('${p.id}','${t.code}')"`}>${esc(t.name)}</span>
+            ${t.ms?'<span title="里程碑" style="color:var(--warn);margin-left:5px">◆</span>':''}
+            ${t._crit&&!t._sum?'<span class="pill late" style="margin-left:6px;font-size:11px">要徑</span>':''}
+            ${(t.logs||[]).length?`<span class="muted" style="margin-left:6px;font-size:11px" title="進度日誌 ${t.logs.length} 筆">🗒${t.logs.length}</span>`:''}</td>
+          ${dense?'':`<td><span class="tag" title="權重">${t.weight}</span></td>
+          <td class="muted" style="font-size:12px">${t._sum?'':t.model}</td>
+          <td class="num muted">${t._sum?'—':(t.dur||0)+'天'}</td>`}
+          <td class="num ${t.planStart?'':'muted'}">${fmt(t._s)}</td>
+          <td class="num muted">${fmt(t._e)}</td>
+          ${dense?'':`<td class="num ${t._as?'':'muted'}">${t._as?fmt(t._as):'—'}</td>`}
+          <td class="num" style="${lateEnd?'color:var(--danger);font-weight:600':'color:var(--txt-3)'}"
+              title="${t._as?'實際開始 '+fmt(t._as):'尚未開始'}">${endTxt||'—'}${lateEnd?' ⚠':''}</td>
+          <td><div style="display:flex;align-items:center;gap:7px">${dualBar(t._prog,t._plan)}
+              ${t._sum?`<span class="num muted" style="font-size:12px;width:38px">${pct(t._prog)}%</span>`
+                :`<input type="range" min="0" max="100" step="5" value="${t.prog||0}" style="width:54px"
+                    oninput="setProg('${p.id}','${t.code}',this.value)">`}</div></td>
+          <td class="num" style="font-size:12.5px;font-weight:600;color:${vcol(vr)}">${vr>=0?'+':''}${pct(vr)}</td>
+          <td>${t._sum?'':`<span class="pill ${st.c}">${st.k}</span>`}</td>
+          <td class="muted" style="font-size:12.5px">${esc(t.owner||'')}</td>
+          ${dense?'':`<td class="num muted" style="font-size:11.5px">${esc(t.deps||'')}</td>`}
+          <td>${t._sum?'':`<button class="btn sm gh" onclick="editTask('${p.id}','${t.code}')">⋯</button>`}</td>
+        </tr>`;}).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* ---------- 甘特圖 ---------- */
+let zoom=6;
+function viewGantt(p){
+  const s0=addDays(p._start,-3), e0=addDays(new Date(Math.max(+p._end,+p._fcEnd)),5);
+  const total=diffDays(s0,e0)+1, W=zoom;
+  const months=[];
+  for(let i=0;i<total;i++){
+    const d=addDays(s0,i), k=d.getFullYear()+'-'+(d.getMonth()+1);
+    if(!months.length||months[months.length-1].k!==k)
+      months.push({k,label:(d.getMonth()+1)+' 月 '+(d.getMonth()===0||i===0?d.getFullYear():''),n:0});
+    months[months.length-1].n++;
+  }
+  const dayCells=W>=14?Array.from({length:total},(_,i)=>{const d=addDays(s0,i);
+    return `<div class="g-day ${isWE(d)?'we':''}" style="width:${W}px">${d.getDate()}</div>`;}).join(''):'';
+  const weBands=W>=4?Array.from({length:total},(_,i)=>{const d=addDays(s0,i);
+    return isWE(d)?`<div class="we" style="left:${i*W}px;width:${W}px"></div>`:'';}).join(''):'';
+  const todayX=diffDays(s0,todayD())*W;
+
+  return `
+  <div class="filters">
+    <span class="muted">縮放</span>
+    <div class="seg">${[['日',18],['週',6],['月',2.6]].map(([l,z])=>
+      `<button class="${zoom==z?'on':''}" onclick="zoom=${z};render()">${l}</button>`).join('')}</div>
+    <div style="flex:1"></div>
+    <span class="pill"><span class="dot" style="color:var(--base)"></span>預定</span>
+    <span class="pill"><span class="dot" style="color:var(--brand)"></span>實際</span>
+    <span class="pill late"><span class="dot"></span>要徑</span>
+    <span class="muted" style="font-size:12.5px">${fmt(p._start)} ～ ${fmt(p._fcEnd)}</span>
+  </div>
+  <div class="gantt-wrap" style="max-height:calc(100vh - 230px)">
+    <div class="g-left">
+      <div class="g-head" style="padding-bottom:9px">任務</div>
+      <div id="glb">${p.tasks.map(t=>`
+        <div class="g-row ${t._sum?'sum':''}">
+          <span class="g-code">${t.code}</span>
+          <span class="g-name" title="${esc(t.name)}" ${t._sum?'':`onclick="editTask('${p.id}','${t.code}')"`}>${esc(t.name)}</span>
+        </div>`).join('')}</div>
+    </div>
+    <div class="g-right" id="gr" onscroll="document.getElementById('glb').style.transform='translateY(-'+this.scrollTop+'px)'">
+      <div class="g-canvas" style="width:${total*W}px">
+        <div class="g-head" style="width:${total*W}px;display:block;height:52px">
+          <div class="g-months">${months.map(m=>`<div class="g-month" style="width:${m.n*W}px">${m.label}</div>`).join('')}</div>
+          <div class="g-days">${dayCells}</div>
+        </div>
+        <div style="position:relative;height:${p.tasks.length*34}px">
+          <div class="g-grid">${weBands}</div>
+          ${todayX>=0&&todayX<=total*W?`<div class="g-today" style="left:${todayX}px"></div>`:''}
+          ${p.tasks.map((t,i)=>{
+            const y=i*34;
+            const bx=diffDays(s0,t._s)*W, bw=Math.max(W,(diffDays(t._s,t._e)+1)*W);
+            const aS=t._as, aE=t._ae||t._ee||todayD();
+            const ax=aS?diffDays(s0,aS)*W:0, aw=aS?Math.max(W,(diffDays(aS,aE)+1)*W):0;
+            const cls=t._sum?'summary':(t._prog>=99.5?'done':(t._crit?'crit':''));
+            const tip=`${esc(t.name)}｜預定 ${fmt(t._s)}~${fmt(t._e)}${aS?`｜實際 ${fmt(aS)}~${t._ae?fmt(t._ae):'進行中'}`:''}｜${pct(t._prog)}%`;
+            const x=aS?ax:bx, w=aS?aw:bw;
+            const row=`<div style="position:absolute;top:${y}px;left:0;right:0;height:34px;border-bottom:1px solid var(--line-2)"></div>`;
+            if(t.ms&&!t._sum)
+              return row+`<div class="g-ms" style="left:${x}px;top:${y+14}px" title="${tip}"
+                onclick="editTask('${p.id}','${t.code}')"></div>`;
+            return row
+              +(t._sum?'':`<div class="g-base" style="left:${bx}px;width:${bw}px;top:${y+5}px" title="預定 ${fmt(t._s)} ~ ${fmt(t._e)}"></div>`)
+              +`<div class="g-bar ${cls}" style="left:${x}px;width:${w}px;top:${y+(t._sum?12:14)}px" title="${tip}"
+                  ${t._sum?'':`onclick="editTask('${p.id}','${t.code}')"`}>
+                  ${t._sum?'':`<i style="width:${100-clamp(t._prog,0,100)}%"></i>`}</div>`
+              +(W>=10?`<div class="g-lb" style="left:${x+w+6}px;top:${y+12}px">${pct(t._prog)}%</div>`:'');
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+/** 開啟甘特圖時自動捲到今天 */
+function syncGantt(){
+  const gr=$('#gr'); if(!gr) return;
+  const t=document.querySelector('.g-today');
+  gr.scrollLeft = t ? Math.max(0, t.offsetLeft - gr.clientWidth/3) : 0;
+}
+
+/* ---------- 文件 ---------- */
+let curFolder='', docView='list', docCat='', docTask='';
+function viewDocs(p){
+  const inFolder=f=>p.files.filter(x=>x.folder===f);
+  const countDeep=f=>p.files.filter(x=>x.folder===f||p.folders.some(o=>o.parent===f&&o.id===x.folder)).length;
+  let files=curFolder?p.files.filter(f=>f.folder===curFolder||p.folders.some(o=>o.parent===curFolder&&o.id===f.folder)):p.files;
+  if(docCat) files=files.filter(f=>f.cat===docCat);
+  if(docTask) files=files.filter(f=>f.task===docTask);
+  if(SEARCH) files=files.filter(f=>(f.name+f.no+(f.task||'')).toLowerCase().includes(SEARCH));
+  files=files.slice().sort((a,b)=>b.mt-a.mt);
+  const roots=p.folders.filter(f=>!f.parent);
+  const tasksWithDocs=[...new Set(p.files.map(f=>f.task).filter(Boolean))].sort(cmpCode);
+
+  return `
+  <div class="doc-lay">
+    <div class="tree">
+      <div class="tnode ${curFolder===''?'on':''}" onclick="curFolder='';render()">
+        <span class="tw">📁</span>全部文件<span class="cnt">${p.files.length}</span></div>
+      ${roots.map(r=>{
+        const subs=p.folders.filter(f=>f.parent===r.id);
+        return `<div class="tnode ${curFolder===r.id?'on':''}" onclick="curFolder='${r.id}';render()">
+            <span class="tw">${subs.length?'▾':'·'}</span>${esc(r.name)}<span class="cnt">${countDeep(r.id)}</span></div>
+          ${subs.map(s=>`<div class="tnode ${curFolder===s.id?'on':''}" style="padding-left:26px"
+              onclick="event.stopPropagation();curFolder='${s.id}';render()">
+              <span class="tw">·</span>${esc(s.name)}<span class="cnt">${inFolder(s.id).length}</span></div>`).join('')}`;
+      }).join('')}
+      <div style="border-top:1px solid var(--line-2);margin:8px 0 4px"></div>
+      <div class="tnode" onclick="addFolder('${p.id}')"><span class="tw">＋</span>新增資料夾</div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div class="drop" id="drop">＋ 新增文件：將檔案拖曳到此處，或
+        <span class="link" onclick="addFile('${p.id}')">手動建檔</span>（可填雲端硬碟連結、可掛到 WBS 任務）</div>
+      <div class="filters" style="margin-bottom:12px">
+        <select onchange="docCat=this.value;render()"><option value="">全部分類</option>
+          ${DOC_CATEGORY.map(c=>`<option ${docCat===c?'selected':''}>${c}</option>`).join('')}</select>
+        <select onchange="docTask=this.value;render()"><option value="">全部任務</option>
+          ${tasksWithDocs.map(c=>`<option value="${c}" ${docTask===c?'selected':''}>${c} ${esc((p._map[c]||{}).name||'')}</option>`).join('')}</select>
+        ${(docCat||docTask)?`<button class="btn sm gh" onclick="docCat='';docTask='';render()">清除</button>`:''}
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <h3>${curFolder?esc((p.folders.find(f=>f.id===curFolder)||{}).name):'全部文件'}</h3>
+          <span class="pill">${files.length}</span><div class="sp"></div>
+          <div class="seg">
+            <button class="${docView==='list'?'on':''}" onclick="docView='list';render()">☰ 清單</button>
+            <button class="${docView==='grid'?'on':''}" onclick="docView='grid';render()">▦ 卡片</button>
+          </div>
+          <button class="btn sm pri" onclick="addFile('${p.id}')">＋ 新增</button>
+        </div>
+        ${files.length===0?`<div class="empty"><div class="big">🗎</div>這裡還沒有文件</div>`
+        : docView==='grid'?`<div class="fgrid">${files.map(f=>`
+            <div class="fcard" onclick="editFile('${p.id}','${f.id}')">
+              <div class="ico">${fileIcon(f.type)}</div>
+              <div class="nm" title="${esc(f.name)}">${esc(f.name)}</div>
+              <div class="muted" style="font-size:11.5px;margin-top:4px">${esc(f.no||'—')}</div>
+              <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">
+                <span class="pill ${flowCls(f.flow)}">${f.flow}</span>
+                ${f.task?`<span class="tag">${f.task}</span>`:''}</div>
+            </div>`).join('')}</div>`
+        :`<div style="overflow:auto"><table class="tbl">
+            <thead><tr><th style="width:36px"></th><th>名稱</th><th style="width:120px">文件編號</th>
+              <th style="width:60px">格式</th><th style="width:132px">分類</th><th style="width:180px">關聯任務</th>
+              <th style="width:96px">流程執行者</th><th style="width:84px">流程狀態</th><th style="width:100px">修改時間</th>
+              <th style="width:44px"></th></tr></thead>
+            <tbody>${files.map(f=>`<tr>
+              <td style="font-size:17px">${fileIcon(f.type)}</td>
+              <td>${f.url?`<a class="link" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)} ↗</a>`
+                        :`<span class="link" onclick="editFile('${p.id}','${f.id}')">${esc(f.name)}</span>`}</td>
+              <td class="num muted">${esc(f.no||'—')}</td>
+              <td class="muted">${esc(f.type||'—')}</td>
+              <td class="muted" style="font-size:12px">${esc(f.cat||'—')}</td>
+              <td>${f.task?`<span class="link" style="font-size:12.5px" onclick="editTask('${p.id}','${f.task}')">
+                     <span class="tag">${f.task}</span> ${esc((p._map[f.task]||{}).name||'')}</span>`:'<span class="muted">—</span>'}</td>
+              <td class="muted" style="font-size:12.5px">${esc(f.flowOwner||'—')}</td>
+              <td><span class="pill ${flowCls(f.flow)}">${f.flow}</span></td>
+              <td class="num muted" style="font-size:12px">${new Date(f.mt).toLocaleDateString('zh-TW')}</td>
+              <td><button class="btn sm gh" onclick="editFile('${p.id}','${f.id}')">⋯</button></td>
+            </tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>
+  </div>`;
+}
+function fileIcon(t){ t=(t||'').toLowerCase();
+  if(/pdf/.test(t))return'📕'; if(/docx?/.test(t))return'📘'; if(/xlsx?|csv/.test(t))return'📗';
+  if(/pptx?/.test(t))return'📙'; if(/dwg|dxf/.test(t))return'📐'; if(/jpe?g|png|gif/.test(t))return'🖼️';
+  if(/zip|rar|7z/.test(t))return'🗜️'; return'🗎'; }
+function flowCls(s){ return (s==='已核准'||s==='已歸檔')?'ok':s==='審核中'?'run':s==='退件'?'late':''; }
+function bindDrop(p){
+  const d=$('#drop'); if(!d) return;
+  ['dragenter','dragover'].forEach(e=>d.addEventListener(e,ev=>{ev.preventDefault();d.classList.add('hot')}));
+  ['dragleave','drop'].forEach(e=>d.addEventListener(e,ev=>{ev.preventDefault();d.classList.remove('hot')}));
+  d.addEventListener('drop',ev=>{
+    const fs=[...(ev.dataTransfer.files||[])]; if(!fs.length) return;
+    const folder=curFolder||p.folders[0].id;
+    fs.forEach(f=>{
+      const ext=(f.name.split('.').pop()||'').toLowerCase();
+      p.files.push({id:uid(),folder,cat:docTask?'任務相關':'專案基本資料相關',task:docTask||'',
+        name:f.name,no:nextDocNo(p,folder),type:ext,flowOwner:'',flow:'未送審',url:'',mt:Date.now()});
+    });
+    save(); render(); toast(`已建檔 ${fs.length} 筆（檔案本體請放雲端硬碟後補連結）`);
+  });
+}
+function nextDocNo(p,folder){
+  const n=p.files.filter(f=>f.folder===folder).length+1;
+  return `GS-${folder}-${String(n).padStart(3,'0')}`;
+}
+
+/* ---------- 表單 ---------- */
+let formGrp='', formTplF='';
+function tpl(id){ return (DB.formTpls||[]).find(t=>t.id===id)||{id,name:'(範本已刪除)',fields:[],items:[]}; }
+function formTitle(f){
+  const t=tpl(f.tpl);
+  return t.name+(f.data&&f.data.date?'　'+f.data.date:'');
+}
+function ngCount(f){ return Object.values(f.checks||{}).filter(c=>c.r==='ng').length; }
+function viewForms(p){
+  const groups=[...new Set((DB.formTpls||[]).map(t=>t.group))];
+  let list=p.forms.slice();
+  if(formGrp) list=list.filter(f=>tpl(f.tpl).group===formGrp);
+  if(formTplF) list=list.filter(f=>f.tpl===formTplF);
+  if(SEARCH) list=list.filter(f=>(tpl(f.tpl).name+JSON.stringify(f.data||{})).toLowerCase().includes(SEARCH));
+  list.sort((a,b)=>b.at-a.at);
+  const tplsInGrp=(DB.formTpls||[]).filter(t=>!formGrp||t.group===formGrp);
+  const ng=p.forms.reduce((a,f)=>a+ngCount(f),0);
+
+  return `
+  <div class="kpis" style="margin-bottom:16px">
+    ${kpi('表單總數',p.forms.length,'本專案已填寫')}
+    ${kpi('待審',p.forms.filter(f=>f.status==='已送出').length,'已送出待核准')}
+    ${kpi('不合格項',ng,ng?'需追蹤改善':'全數合格',ng?'bad':'good')}
+    ${kpi('可用範本',(DB.formTpls||[]).length,'含進料檢驗與自主檢查')}
+  </div>
+  <div class="filters">
+    <div class="seg">
+      <button class="${formGrp===''?'on':''}" onclick="formGrp='';formTplF='';render()">全部</button>
+      ${groups.map(g=>`<button class="${formGrp===g?'on':''}" onclick="formGrp='${g}';formTplF='';render()">${g}</button>`).join('')}
+    </div>
+    <select onchange="formTplF=this.value;render()"><option value="">全部表單種類</option>
+      ${tplsInGrp.map(t=>`<option value="${t.id}" ${formTplF===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select>
+    <div style="flex:1"></div>
+    <button class="btn sm" onclick="manageTpls()">⚙ 表單範本</button>
+    <button class="btn pri sm" onclick="pickForm('${p.id}')">＋ 填寫表單</button>
+  </div>
+  <div class="card" style="overflow:auto">
+    <div class="card-h"><h3>已填寫表單</h3><span class="pill">${list.length}</span></div>
+    ${list.length?`<table class="tbl">
+      <thead><tr><th style="width:36px"></th><th style="width:84px">編號</th><th>表單</th>
+        <th style="width:104px">日期</th><th style="width:150px">關聯任務</th>
+        <th style="width:90px">填表人</th><th style="width:76px">不合格</th>
+        <th style="width:82px">狀態</th><th style="width:44px"></th></tr></thead>
+      <tbody>${list.map(f=>{const t=tpl(f.tpl),n=ngCount(f);return `<tr>
+        <td style="font-size:17px">${t.icon||'🗒'}</td>
+        <td class="num muted">${esc(f.no||'—')}</td>
+        <td><span class="link" onclick="openForm('${p.id}','${f.id}')">${esc(t.name)}</span></td>
+        <td class="num muted">${esc((f.data||{}).date||'—')}</td>
+        <td>${f.task?`<span class="link" style="font-size:12.5px" onclick="editTask('${p.id}','${f.task}')">
+              <span class="tag">${f.task}</span> ${esc((p._map[f.task]||{}).name||'')}</span>`:'<span class="muted">—</span>'}</td>
+        <td class="muted" style="font-size:12.5px">${esc(f.by||'')}</td>
+        <td>${n?`<span class="pill late">${n} 項</span>`:'<span class="muted">—</span>'}</td>
+        <td><span class="pill ${f.status==='已核准'?'ok':f.status==='已送出'?'run':f.status==='退件'?'late':''}">${f.status}</span></td>
+        <td><button class="btn sm gh" onclick="openForm('${p.id}','${f.id}')">⋯</button></td>
+      </tr>`;}).join('')}</tbody></table>`
+    :`<div class="empty"><div class="big">🗒</div>還沒有填寫任何表單
+        <div style="margin-top:12px"><button class="btn pri" onclick="pickForm('${p.id}')">＋ 填寫表單</button></div></div>`}
+  </div>`;
+}
+
+/** 選表單種類 */
+function pickForm(pid){
+  const groups=[...new Set((DB.formTpls||[]).map(t=>t.group))];
+  modal('選擇表單',`<div class="modal-b">
+    ${groups.map(g=>`
+      <div style="font-size:12px;font-weight:600;color:var(--txt-2);margin:4px 0 8px">${g}</div>
+      <div class="fgrid" style="padding:0 0 14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))">
+        ${DB.formTpls.filter(t=>t.group===g).map(t=>`
+          <div class="fcard" onclick="newForm('${pid}','${t.id}')">
+            <div class="ico">${t.icon||'🗒'}</div>
+            <div class="nm" title="${esc(t.name)}">${esc(t.name)}</div>
+            <div class="muted" style="font-size:11.5px;margin-top:4px">${(t.items||[]).length?`${t.items.length} 個檢查項`:`${t.fields.length} 個欄位`}</div>
+          </div>`).join('')}
+      </div>`).join('')}
+    </div>`,`<button class="btn" onclick="closeModal()">取消</button>`,true);
+}
+function nextFormNo(p){ return 'F-'+String(p.forms.length+1).padStart(4,'0'); }
+function newForm(pid,tplId){
+  const p=DB.projects.find(x=>x.id===pid);
+  const f={id:uid(),tpl:tplId,task:'',status:'草稿',no:nextFormNo(p),by:'',at:Date.now(),
+           data:{date:today()},checks:{}};
+  p.forms.push(f); save(); openForm(pid,f.id);
+}
+/** 填寫／檢視表單（手機也好按） */
+function openForm(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid);
+  const f=p.forms.find(x=>x.id===fid); if(!f) return;
+  const t=tpl(f.tpl);
+  const fld=x=>{
+    const v=(f.data||{})[x.k]??'';
+    const id='ff_'+x.k;
+    if(x.t==='area') return `<label class="field"><span>${x.l}${x.req?' *':''}</span><textarea id="${id}" rows="2">${esc(v)}</textarea></label>`;
+    if(x.t==='sel') return `<label class="field"><span>${x.l}${x.req?' *':''}</span><select id="${id}">
+      <option value=""></option>${x.o.map(o=>`<option ${v===o?'selected':''}>${o}</option>`).join('')}</select></label>`;
+    return `<label class="field"><span>${x.l}${x.req?' *':''}</span>
+      <input id="${id}" type="${x.t==='date'?'date':x.t==='num'?'number':'text'}" value="${esc(v)}"></label>`;
+  };
+  const heads=t.fields.filter(x=>x.t!=='area'), areas=t.fields.filter(x=>x.t==='area');
+  const checks=(t.items||[]).map((it,i)=>{
+    const c=(f.checks||{})[i]||{r:'',note:''};
+    return `<div class="ck">
+      <div class="ck-t">${i+1}. ${esc(it)}</div>
+      <div class="ck-r">
+        ${[['ok','合格'],['ng','不合格'],['na','不適用']].map(([k,l])=>
+          `<button type="button" class="ck-b ${k} ${c.r===k?'on':''}" onclick="setCheck('${pid}','${fid}',${i},'${k}')">${l}</button>`).join('')}
+      </div>
+      <input class="ck-n" id="cn_${i}" placeholder="備註" value="${esc(c.note||'')}"
+        onchange="setCheckNote('${pid}','${fid}',${i},this.value)">
+    </div>`;
+  }).join('');
+
+  modal(`${t.icon||'🗒'} ${esc(t.name)}　<span class="muted" style="font-weight:400;font-size:12.5px">${esc(f.no)}</span>`,
+   `<div class="modal-b">
+      <div class="fgridx">${heads.map(fld).join('')}</div>
+      ${areas.map(fld).join('')}
+      <div class="row2">
+        <label class="field"><span>關聯 WBS 任務</span><select id="ff_task"><option value="">（不關聯）</option>
+          ${p.tasks.filter(x=>!x._sum).map(x=>`<option value="${x.code}" ${f.task===x.code?'selected':''}>${x.code} ${esc(x.name)}</option>`).join('')}</select></label>
+        <label class="field"><span>表單狀態</span><select id="ff_status">
+          ${FORM_STATUS.map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
+      </div>
+      ${checks?`<div style="font-size:12px;font-weight:600;color:var(--txt-2);margin:6px 0 10px;
+          display:flex;align-items:center;gap:10px">檢查項目
+          <span class="pill">${(t.items||[]).length} 項</span>
+          <span style="flex:1"></span>
+          <button class="btn sm" onclick="allCheck('${pid}','${fid}','ok')">全部合格</button>
+          <button class="btn sm gh" onclick="allCheck('${pid}','${fid}','')">清除</button></div>
+        <div class="cklist">${checks}</div>`:''}
+    </div>`,
+   `<button class="btn gh dgr" style="margin-right:auto" onclick="delForm('${pid}','${fid}')">刪除</button>
+    <button class="btn" onclick="printForm('${pid}','${fid}')">列印 / 存 PDF</button>
+    <button class="btn" onclick="closeModal()">取消</button>
+    <button class="btn pri" onclick="saveForm('${pid}','${fid}')">儲存</button>`,true);
+}
+function setCheck(pid,fid,i,r){
+  const f=DB.projects.find(x=>x.id===pid).forms.find(x=>x.id===fid);
+  f.checks=f.checks||{}; f.checks[i]=f.checks[i]||{r:'',note:''};
+  f.checks[i].r = f.checks[i].r===r ? '' : r;
+  save();
+  document.querySelectorAll(`.ck`)[i].querySelectorAll('.ck-b').forEach(b=>{
+    b.classList.toggle('on', b.classList.contains(f.checks[i].r));
+  });
+}
+function setCheckNote(pid,fid,i,v){
+  const f=DB.projects.find(x=>x.id===pid).forms.find(x=>x.id===fid);
+  f.checks=f.checks||{}; f.checks[i]=f.checks[i]||{r:'',note:''}; f.checks[i].note=v; save();
+}
+function allCheck(pid,fid,r){
+  const p=DB.projects.find(x=>x.id===pid), f=p.forms.find(x=>x.id===fid);
+  const t=tpl(f.tpl); f.checks=f.checks||{};
+  (t.items||[]).forEach((_,i)=>{ f.checks[i]=f.checks[i]||{r:'',note:''}; f.checks[i].r=r; });
+  save(); openForm(pid,fid);
+}
+function saveForm(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid), f=p.forms.find(x=>x.id===fid), t=tpl(f.tpl);
+  const d={};
+  for(const x of t.fields){
+    const v=val('ff_'+x.k);
+    if(x.req&&!v) return toast('請填寫「'+x.l+'」');
+    d[x.k]=v;
+  }
+  f.data=d; f.task=val('ff_task'); f.status=val('ff_status');
+  f.by=d.by||d.host||d.by||f.by||''; f.at=Date.now();
+  save(); closeModal(); render(); toast('表單已儲存');
+}
+function delForm(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid);
+  p.forms=p.forms.filter(f=>f.id!==fid); save(); closeModal(); render(); toast('已刪除表單');
+}
+/** 另開視窗列印，可存成 PDF 歸檔 */
+function printForm(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid), f=p.forms.find(x=>x.id===fid), t=tpl(f.tpl);
+  const rows=t.fields.map(x=>`<tr><th>${esc(x.l)}</th><td>${esc((f.data||{})[x.k]||'')}</td></tr>`).join('');
+  const lbl={ok:'合格',ng:'不合格',na:'不適用'};
+  const items=(t.items||[]).map((it,i)=>{const c=(f.checks||{})[i]||{};
+    return `<tr><td style="width:28px">${i+1}</td><td>${esc(it)}</td>
+      <td style="width:70px;text-align:center;${c.r==='ng'?'color:#c0392b;font-weight:700':''}">${lbl[c.r]||''}</td>
+      <td style="width:180px">${esc(c.note||'')}</td></tr>`;}).join('');
+  const w=window.open('','_blank');
+  if(!w) return toast('瀏覽器阻擋了新視窗，請允許彈出視窗');
+  w.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
+    <title>${esc(t.name)}_${esc(f.no)}</title><style>
+    body{font-family:"Microsoft JhengHei",sans-serif;font-size:13px;padding:28px;color:#111}
+    h1{font-size:19px;margin:0 0 4px}.sub{color:#666;font-size:12px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;margin-bottom:14px}
+    th,td{border:1px solid #999;padding:6px 8px;text-align:left;vertical-align:top}
+    th{background:#f2f4f6;width:130px;font-weight:600}
+    .it th{background:#f2f4f6;width:auto;text-align:center}
+    .sign{margin-top:36px;display:flex;gap:40px}
+    .sign div{flex:1;border-top:1px solid #333;padding-top:6px;text-align:center;color:#555}
+    @media print{body{padding:0}}
+    </style></head><body>
+    <h1>${esc(t.name)}</h1>
+    <div class="sub">專案：${esc(p.name)}　|　表單編號：${esc(f.no)}　|　狀態：${esc(f.status)}
+      ${f.task?`　|　關聯任務：${esc(f.task)} ${esc((p._map[f.task]||{}).name||'')}`:''}</div>
+    <table>${rows}</table>
+    ${items?`<table class="it"><thead><tr><th>#</th><th>檢查項目</th><th>結果</th><th>備註</th></tr></thead>
+      <tbody>${items}</tbody></table>`:''}
+    <div class="sign"><div>填表人</div><div>複核</div><div>核准</div></div>
+    </body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
+}
+
+/** 表單範本管理：換成公司實際版本 */
+function manageTpls(){
+  const groups=[...new Set(DB.formTpls.map(t=>t.group))];
+  modal('表單範本',`<div class="modal-b">
+    <p class="muted" style="margin-top:0;font-size:12.5px">
+      這裡的欄位與檢查項目是<b>依業界通用版本草擬</b>的，請改成貴公司實際使用的版本。改過之後，之後填的表單都會套用新版。</p>
+    ${groups.map(g=>`
+      <div style="font-size:12px;font-weight:600;color:var(--txt-2);margin:14px 0 6px">${g}</div>
+      <table class="tbl"><tbody>${DB.formTpls.filter(t=>t.group===g).map(t=>`
+        <tr><td style="width:30px;font-size:16px">${t.icon||'🗒'}</td>
+          <td>${esc(t.name)}</td>
+          <td class="muted" style="width:150px;font-size:12px">${t.fields.length} 欄位${(t.items||[]).length?`、${t.items.length} 檢查項`:''}</td>
+          <td style="width:64px"><button class="btn sm" onclick="editTpl('${t.id}')">編輯</button></td>
+        </tr>`).join('')}</tbody></table>`).join('')}
+    </div>`,`<button class="btn" onclick="closeModal()">關閉</button>`,true);
+}
+function editTpl(id){
+  const t=tpl(id);
+  modal('編輯範本：'+esc(t.name),`<div class="modal-b">
+    <div class="row2">
+      <label class="field"><span>表單名稱</span><input id="tp_name" value="${esc(t.name)}"></label>
+      <label class="field"><span>分類</span><input id="tp_group" value="${esc(t.group)}"></label>
+    </div>
+    <label class="field"><span>欄位（每行一個：標題｜型別 text/area/date/num/sel｜選項以逗號分隔｜必填填 *）</span>
+      <textarea id="tp_fields" rows="7" style="font-family:ui-monospace,monospace;font-size:12.5px">${
+        esc(t.fields.map(f=>[f.l,f.t,(f.o||[]).join(','),f.req?'*':''].join('|').replace(/\|+$/,'')).join('\n'))}</textarea></label>
+    <label class="field"><span>檢查項目（每行一項，留空代表這張表沒有勾選項）</span>
+      <textarea id="tp_items" rows="9" style="font-size:12.5px">${esc((t.items||[]).join('\n'))}</textarea></label>
+    </div>`,
+    `<button class="btn" onclick="manageTpls()">返回</button>
+     <button class="btn pri" onclick="saveTpl('${id}')">儲存範本</button>`,true);
+}
+function saveTpl(id){
+  const t=DB.formTpls.find(x=>x.id===id); if(!t) return;
+  const name=val('tp_name'); if(!name) return toast('請輸入表單名稱');
+  const old=t.fields.slice();
+  const fields=val('tp_fields').split('\n').map(s=>s.trim()).filter(Boolean).map((line,i)=>{
+    const [l,ty,opts,req]=line.split('|').map(s=>(s||'').trim());
+    const t2=['text','area','date','num','sel'].includes(ty)?ty:'text';
+    // 標題沒變就沿用原 key，已填寫的表單資料才不會對不上
+    const same=old.find(f=>f.l===l) || (old[i]&&old[i].l===l?old[i]:null);
+    const k=same?same.k:(l.replace(/[^\w一-鿿]/g,'')||('f'+Math.random().toString(36).slice(2,6)));
+    const o={k,l,t:t2};
+    if(t2==='sel') o.o=(opts||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if(req==='*'||opts==='*') o.req=1;
+    return o;
+  });
+  if(!fields.length) return toast('至少要有一個欄位');
+  t.name=name; t.group=val('tp_group')||'其他'; t.fields=fields;
+  t.items=val('tp_items').split('\n').map(s=>s.trim()).filter(Boolean);
+  save(); manageTpls(); toast('範本已更新');
+}
+
+/* ---------- 成員與設定 ---------- */
+function viewTeam(p){
+  const byRole={}; ROLES.forEach(r=>byRole[r]=p.members.filter(m=>m.role===r));
+  return `<div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card">
+      <div class="card-h"><h3>專案團隊</h3><span class="pill">${p.members.length}</span><div class="sp"></div>
+        <button class="btn sm" onclick="addMember('${p.id}')">＋ 新增成員</button></div>
+      ${p.members.length?ROLES.filter(r=>byRole[r].length).map(r=>`
+        <div style="padding:10px 16px 2px"><div class="muted" style="font-size:12px;font-weight:600">${r}</div></div>
+        <table class="tbl"><tbody>${byRole[r].map(m=>`
+          <tr><td style="width:110px">${esc(m.name)}</td><td class="muted">${esc(m.dept||'')}</td>
+          <td style="width:56px"><button class="btn sm gh dgr" onclick="delMember('${p.id}',${p.members.indexOf(m)})">移除</button></td></tr>`).join('')}
+        </tbody></table>`).join(''):`<div class="empty">尚未指派成員</div>`}
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>專案設定</h3></div>
+      <div style="padding:16px">
+        ${[['編輯專案基本資料',`editProject('${p.id}')`],
+           ['以 EPC 標準範本重置任務',`resetTasks('${p.id}')`],
+           ['匯出進度 CSV',`exportCSV('${p.id}')`],
+           ['複製為新專案',`dupProject('${p.id}')`]].map(([l,f])=>
+          `<button class="btn" style="width:100%;justify-content:center;margin-bottom:8px" onclick="${f}">${l}</button>`).join('')}
+        <button class="btn dgr" style="width:100%;justify-content:center" onclick="delProject('${p.id}')">刪除此專案</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- 跨專案 ---------- */
+function viewMyTasks(){
+  const n=todayD(), rows=[];
+  DB.projects.forEach(p=>p.tasks.forEach(t=>{
+    if(t._sum||(t.prog||0)>=100) return;
+    if(diffDays(n,t._s)<=21) rows.push({p,t});
+  }));
+  rows.sort((a,b)=>variance(a.t)-variance(b.t));
+  return `<div class="card" style="overflow:auto">
+    <div class="card-h"><h3>近期待辦（含逾期，未來三週）</h3><span class="pill">${rows.length}</span>
+      <div class="sp"></div><span class="muted" style="font-size:12px">依落後幅度排序</span></div>
+    ${rows.length?`<table class="tbl">
+      <thead><tr><th style="width:210px">專案</th><th style="width:56px">編碼</th><th>任務</th>
+        <th style="width:112px">預定開始</th><th style="width:112px">預定完成</th><th style="width:58px">偏差</th>
+        <th style="width:74px">狀態</th><th style="width:88px">負責人</th></tr></thead>
+      <tbody>${rows.map(({p,t})=>{const st=taskStatus(t),vr=variance(t);return `<tr>
+        <td><span class="link" onclick="go('#/p/${p.id}/schedule')">${esc(p.name)}</span></td>
+        <td class="num muted">${t.code}</td>
+        <td><span class="link" onclick="editTask('${p.id}','${t.code}')">${esc(t.name)}</span></td>
+        <td class="num muted">${fmt(t._s)}</td><td class="num muted">${fmt(t._e)}</td>
+        <td class="num" style="font-weight:600;font-size:12.5px;color:${vcol(vr)}">${vr>=0?'+':''}${pct(vr)}</td>
+        <td><span class="pill ${st.c}">${st.k}</span></td><td class="muted">${esc(t.owner||'')}</td>
+      </tr>`;}).join('')}</tbody></table>`:`<div class="empty">近期沒有待辦</div>`}
+  </div>`;
+}
+function viewAllFiles(){
+  const rows=[];
+  DB.projects.forEach(p=>p.files.forEach(f=>rows.push({p,f})));
+  const list=(SEARCH?rows.filter(({f})=>(f.name+f.no).toLowerCase().includes(SEARCH)):rows)
+    .sort((a,b)=>b.f.mt-a.f.mt);
+  return `<div class="card" style="overflow:auto">
+    <div class="card-h"><h3>全部文件</h3><span class="pill">${list.length}</span></div>
+    ${list.length?`<table class="tbl">
+      <thead><tr><th style="width:36px"></th><th style="width:210px">專案</th><th>名稱</th>
+        <th style="width:120px">文件編號</th><th style="width:66px">任務</th>
+        <th style="width:84px">流程狀態</th><th style="width:100px">修改時間</th></tr></thead>
+      <tbody>${list.map(({p,f})=>`<tr>
+        <td style="font-size:17px">${fileIcon(f.type)}</td>
+        <td><span class="link" onclick="go('#/p/${p.id}/docs')">${esc(p.name)}</span></td>
+        <td>${f.url?`<a class="link" href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)} ↗</a>`:esc(f.name)}</td>
+        <td class="num muted">${esc(f.no||'—')}</td>
+        <td>${f.task?`<span class="tag">${f.task}</span>`:'<span class="muted">—</span>'}</td>
+        <td><span class="pill ${flowCls(f.flow)}">${f.flow}</span></td>
+        <td class="num muted" style="font-size:12px">${new Date(f.mt).toLocaleDateString('zh-TW')}</td>
+      </tr>`).join('')}</tbody></table>`:`<div class="empty">尚無文件</div>`}
+  </div>`;
+}
+
+/* =========================== 互動 =========================== */
+function onSearch(v){ SEARCH=v.trim().toLowerCase(); render(); }
+function toggleStar(id){ const p=DB.projects.find(x=>x.id===id); p.star=!p.star; save(); render(); }
+function setProg(pid,code,v){
+  const t=DB.projects.find(x=>x.id===pid).tasks.find(t=>t.code===code);
+  t.prog=+v;
+  if(t.prog>0&&!t.actStart) t.actStart=today();
+  if(t.prog>=100&&!t.actEnd) t.actEnd=today();
+  if(t.prog<100&&t.actEnd) t.actEnd='';
+  save(); clearTimeout(setProg._t); setProg._t=setTimeout(render,320);
+}
+function togglePay(pid,code){
+  const t=DB.projects.find(x=>x.id===pid).tasks.find(t=>t.code===code);
+  const on=(t.prog||0)>=100;
+  t.prog=on?0:100; t.actEnd=on?'':today();
+  if(!on&&!t.actStart) t.actStart=today();
+  save(); render();
+}
+function setMode(pid,v){ DB.projects.find(x=>x.id===pid).calendarMode=v; save(); render(); }
+
+function modal(title,body,footer,wide){
+  $('#modal').innerHTML=`<div class="mask" onclick="if(event.target===this)closeModal()">
+    <div class="modal ${wide?'wide':''}"><div class="modal-h"><h3>${title}</h3>
+      <button class="btn sm gh" onclick="closeModal()">✕</button></div>
+      ${body}<div class="modal-f">${footer}</div></div></div>`;
+}
+function closeModal(){ $('#modal').innerHTML=''; }
+function val(id){ const e=document.getElementById(id); return e?e.value.trim():''; }
+
+/* ---- 專案 ---- */
+function newProject(){ projectForm(blankProject(),true); }
+function editProject(id){ projectForm(DB.projects.find(x=>x.id===id),false); }
+function projectForm(p,isNew){
+  modal(isNew?'新增專案':'編輯專案',`<div class="modal-b">
+    <label class="field"><span>專案名稱 *</span><input id="f_name" value="${esc(p.name)}"></label>
+    <div class="row3">
+      <label class="field"><span>專案代號</span><input id="f_code" value="${esc(p.code)}" placeholder="DEMO-001"></label>
+      <label class="field"><span>專案狀態</span><select id="f_status">${PROJ_STATUS.map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
+      <label class="field"><span>機密等級</span><select id="f_secret">${SECRET_LV.map(s=>`<option ${p.secret===s?'selected':''}>${s}</option>`).join('')}</select></label>
+    </div>
+    <div class="row2">
+      <label class="field"><span>客戶</span><input id="f_customer" value="${esc(p.customer)}"></label>
+      <label class="field"><span>案件地點</span><input id="f_site" value="${esc(p.site)}"></label>
+    </div>
+    <div class="row4">
+      <label class="field"><span>光電容量 (kW)</span><input id="f_cap" value="${esc(p.capacity)}"></label>
+      <label class="field"><span>儲能容量 (kW)</span><input id="f_ess" value="${esc(p.essCapacity)}"></label>
+      <label class="field"><span>發電類型</span><input id="f_gen" value="${esc(p.genType)}" placeholder="自發自用 / 躉售"></label>
+      <label class="field"><span>PV 編碼</span><input id="f_pv" value="${esc(p.pvCode)}"></label>
+    </div>
+    <div class="row4">
+      <label class="field"><span>類別</span><input id="f_cat" value="${esc(p.category)}"></label>
+      <label class="field"><span>預定開始日</span><input id="f_start" type="date" value="${p.start||''}"></label>
+      <label class="field"><span>必須完成日</span><input id="f_due" type="date" value="${p.due||''}"></label>
+      <label class="field"><span>預定掛表日</span><input id="f_meter" type="date" value="${p.meterDate||''}"></label>
+    </div>
+    <label class="field"><span>專案主持人</span><input id="f_owner" value="${esc(p.owner)}"></label>
+    <label class="field"><span>備註</span><textarea id="f_note" rows="2">${esc(p.note)}</textarea></label>
+    ${isNew?`<label class="field"><span>套用時程範本</span><select id="f_tpl">
+       <option value="epc">EPC 標準時程（81 項任務，含階段權重）</option><option value="none">空白專案</option></select></label>`:''}
+    </div>`,
+    `<button class="btn" onclick="closeModal()">取消</button>
+     <button class="btn pri" onclick="saveProject('${p.id}',${isNew})">${isNew?'建立專案':'儲存'}</button>`,true);
+}
+function saveProject(id,isNew){
+  const name=val('f_name'); if(!name) return toast('請輸入專案名稱');
+  const p=isNew?blankProject({id}):DB.projects.find(x=>x.id===id);
+  Object.assign(p,{name,code:val('f_code'),status:val('f_status'),secret:val('f_secret'),
+    customer:val('f_customer'),site:val('f_site'),capacity:val('f_cap'),essCapacity:val('f_ess'),
+    genType:val('f_gen'),pvCode:val('f_pv'),category:val('f_cat'),owner:val('f_owner'),
+    start:val('f_start')||today(),due:val('f_due'),meterDate:val('f_meter'),note:val('f_note')});
+  if(isNew){
+    if(val('f_tpl')==='none') p.tasks=[];
+    DB.projects.unshift(p); save(); closeModal(); go('#/p/'+p.id+'/overview'); toast('專案已建立');
+  }else{ save(); closeModal(); render(); toast('已儲存'); }
+}
+function dupProject(id){
+  const src=DB.projects.find(x=>x.id===id);
+  const p=JSON.parse(JSON.stringify(src,(k,v)=>k.startsWith('_')?undefined:v));
+  p.id=uid(); p.name=src.name+'（複製）'; p.code=''; p.created=Date.now(); p.star=false; p.files=[];
+  p.tasks.forEach(t=>{ t.prog=0; t.actStart=''; t.actEnd=''; t.expEnd=''; t.logs=[]; });
+  DB.projects.unshift(p); save(); go('#/p/'+p.id+'/overview'); toast('已複製（進度歸零、文件未帶入）');
+}
+function delProject(id){
+  const p=DB.projects.find(x=>x.id===id);
+  modal('刪除專案',`<div class="modal-b"><p>確定要刪除 <b>${esc(p.name)}</b>？此動作無法復原，含 ${p.tasks.length} 項任務與 ${p.files.length} 筆文件紀錄。</p>
+    <p class="muted" style="font-size:12.5px">建議先到左下角「資料」匯出備份。</p></div>`,
+    `<button class="btn" onclick="closeModal()">取消</button>
+     <button class="btn pri" style="background:var(--danger);border-color:var(--danger)" onclick="doDelProject('${id}')">確定刪除</button>`);
+}
+function doDelProject(id){ DB.projects=DB.projects.filter(x=>x.id!==id); save(); closeModal(); go('#/projects'); render(); toast('已刪除'); }
+function resetTasks(id){
+  const p=DB.projects.find(x=>x.id===id);
+  modal('重置任務',`<div class="modal-b"><p>將 <b>${esc(p.name)}</b> 的任務清單換成 EPC 標準範本（81 項），<b>現有進度與日誌會清空</b>。</p></div>`,
+   `<button class="btn" onclick="closeModal()">取消</button>
+    <button class="btn pri" onclick="doReset('${id}')">確定重置</button>`);
+}
+function doReset(id){ DB.projects.find(x=>x.id===id).tasks=parseTemplate(); save(); closeModal(); render(); toast('已套用 EPC 標準範本'); }
+
+/* ---- 任務（含進度日誌、關聯文件） ---- */
+let taskTab='info';
+function addTask(pid){ taskTab='info'; taskForm(pid,null); }
+function editTask(pid,code){ taskTab='info'; taskForm(pid,code); }
+function switchTaskTab(pid,code,tab){ taskTab=tab; taskForm(pid,code); }
+function taskForm(pid,code){
+  const p=DB.projects.find(x=>x.id===pid);
+  const t=code?p.tasks.find(x=>x.code===code)
+              :{code:'',name:'',dur:1,deps:'',weight:10,model:'比例法',ms:false,owner:'',exec:'',hours:'',
+                planStart:'',planEnd:'',actStart:'',actEnd:'',expEnd:'',prog:0,note:'',logs:[]};
+  if(!t) return toast('找不到任務');
+  const rel=code?p.files.filter(f=>f.task===code):[];
+  const vr=code?variance(t):0;
+
+  const info=`<div class="modal-b">
+    <div class="row4">
+      <label class="field"><span>WBS 編碼 *</span><input id="t_code" value="${t.code}" ${code?'readonly':''}></label>
+      <label class="field"><span>原定工期（天）</span><input id="t_dur" type="number" min="1" value="${t.dur||1}"></label>
+      <label class="field"><span>權重</span><input id="t_weight" type="number" min="0" value="${t.weight??10}"></label>
+      <label class="field"><span>進度模型</span><select id="t_model">${PROG_MODEL.map(m=>`<option ${t.model===m?'selected':''}>${m}</option>`).join('')}</select></label>
+    </div>
+    <label class="field"><span>任務名稱 *</span><input id="t_name" value="${esc(t.name)}"></label>
+    <div class="row4">
+      <label class="field"><span>負責人</span><input id="t_owner" value="${esc(t.owner||'')}"></label>
+      <label class="field"><span>執行人</span><input id="t_exec" value="${esc(t.exec||'')}"></label>
+      <label class="field"><span>實際工時</span><input id="t_hours" value="${esc(t.hours||'')}"></label>
+      <label class="field"><span>實際進度 %</span><input id="t_prog" type="number" min="0" max="100" step="5" value="${t.prog||0}"></label>
+    </div>
+    <div style="font-size:12px;color:var(--txt-2);font-weight:600;margin:4px 0 8px">日期</div>
+    <div class="row3">
+      <label class="field"><span>預定開始（留空＝自動排程）</span><input id="t_ps" type="date" value="${t.planStart||''}"></label>
+      <label class="field"><span>實際開始</span><input id="t_as" type="date" value="${t.actStart||''}"></label>
+      <label class="field"><span>實際完成</span><input id="t_ae" type="date" value="${t.actEnd||''}"></label>
+    </div>
+    <div class="row3">
+      <label class="field"><span>預定完成（留空＝自動排程）</span><input id="t_pe" type="date" value="${t.planEnd||''}"></label>
+      <label class="field"><span>預期完成（預測）</span><input id="t_ee" type="date" value="${t.expEnd||''}"></label>
+      <label class="field"><span>里程碑</span>
+        <select id="t_ms"><option value="0" ${!t.ms?'selected':''}>否</option><option value="1" ${t.ms?'selected':''}>是</option></select></label>
+    </div>
+    <label class="field"><span>前置任務</span><input id="t_deps" value="${esc(t.deps||'')}" placeholder="例 2.1FS0,3.4FS-3"></label>
+    <div class="muted" style="font-size:12px;margin:-6px 0 12px">
+      語法：<b>編碼＋關係＋延遲天數</b>。FS＝前者完成後開始、SS＝同時開始、FF＝同時完成、SF＝前者開始後完成；延遲可為負數，多筆以逗號分隔。</div>
+    <label class="field"><span>備註</span><textarea id="t_note" rows="2">${esc(t.note||'')}</textarea></label>
+    ${code?`<div class="muted" style="font-size:12.5px;border-top:1px solid var(--line-2);padding-top:10px">
+      預定 ${fmt(t._s)} ～ ${fmt(t._e)}　|　預定進度 ${pct(t._plan)}%、實際 ${pct(t._prog)}%、
+      <b style="color:${vcol(vr)}">偏差 ${vr>=0?'+':''}${pct(vr)}%</b>　|
+      浮時 ${t._float>=0?t._float:0} 天${t._crit?'　<b style="color:var(--danger)">位於要徑</b>':''}</div>`:''}
+    </div>`;
+
+  const logsSorted=(t.logs||[]).map((l,i)=>({l,i})).sort((a,b)=>String(b.l.ts).localeCompare(String(a.l.ts)));
+  const logs=`<div class="modal-b">
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      <input id="l_text" placeholder="輸入今天的進度說明…" style="flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)">
+      <input id="l_who" placeholder="記錄人" value="${esc(t.owner||'')}" style="width:104px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)">
+      <button class="btn pri" onclick="addLog('${pid}','${code}')">新增</button>
+    </div>
+    ${logsSorted.length?`<div class="log">${logsSorted.map(({l,i})=>`
+      <div class="it"><div class="mt">${esc(l.ts)}${l.who?'　'+esc(l.who):''}
+        <button class="btn sm gh dgr" style="float:right;padding:0 6px" onclick="delLog('${pid}','${code}',${i})">刪除</button></div>
+        <div class="bd">${esc(l.text)}</div></div>`).join('')}</div>`
+    :`<div class="empty">還沒有進度日誌。每有進展就記一筆，結案時就是完整歷程。</div>`}
+  </div>`;
+
+  const docs=`<div class="modal-b">
+    ${rel.length?`<table class="tbl"><thead><tr><th>名稱</th><th style="width:120px">文件編號</th>
+      <th style="width:84px">流程狀態</th><th style="width:44px"></th></tr></thead>
+      <tbody>${rel.map(f=>`<tr><td>${fileIcon(f.type)} ${esc(f.name)}</td><td class="num muted">${esc(f.no)}</td>
+        <td><span class="pill ${flowCls(f.flow)}">${f.flow}</span></td>
+        <td><button class="btn sm gh" onclick="editFile('${pid}','${f.id}')">⋯</button></td></tr>`).join('')}</tbody></table>`
+    :`<div class="empty">這個任務底下還沒有文件</div>`}
+    <div style="padding:14px 0 0"><button class="btn" onclick="addFileForTask('${pid}','${code}')">＋ 新增文件到這個任務</button></div>
+  </div>`;
+
+  const tabs=code?`<div class="mtabs">
+    <button class="${taskTab==='info'?'on':''}" onclick="switchTaskTab('${pid}','${code}','info')">任務內容</button>
+    <button class="${taskTab==='logs'?'on':''}" onclick="switchTaskTab('${pid}','${code}','logs')">進度日誌 ${(t.logs||[]).length||''}</button>
+    <button class="${taskTab==='docs'?'on':''}" onclick="switchTaskTab('${pid}','${code}','docs')">關聯文件 ${rel.length||''}</button>
+  </div>`:'';
+
+  modal(code?`${t.code}　${esc(t.name)}`:'新增任務',
+    tabs+(taskTab==='logs'?logs:taskTab==='docs'?docs:info),
+    taskTab==='info'
+      ? `${code?`<button class="btn gh dgr" style="margin-right:auto" onclick="delTask('${pid}','${code}')">刪除任務</button>`:''}
+         <button class="btn" onclick="closeModal()">取消</button>
+         <button class="btn pri" onclick="saveTask('${pid}','${code||''}')">儲存</button>`
+      : `<button class="btn" onclick="closeModal()">關閉</button>`,
+    true);
+}
+function saveTask(pid,code){
+  const p=DB.projects.find(x=>x.id===pid);
+  const c=val('t_code'), n=val('t_name');
+  if(!c||!n) return toast('編碼與名稱為必填');
+  if(!code&&p.tasks.some(t=>t.code===c)) return toast('此 WBS 編碼已存在');
+  const data={code:c,name:n,dur:+val('t_dur')||1,deps:val('t_deps'),
+    weight:+val('t_weight')||0, model:val('t_model'), ms:val('t_ms')==='1',
+    owner:val('t_owner'), exec:val('t_exec'), hours:val('t_hours'),
+    planStart:val('t_ps'), planEnd:val('t_pe'), actStart:val('t_as'), actEnd:val('t_ae'), expEnd:val('t_ee'),
+    prog:clamp(+val('t_prog')||0,0,100), note:val('t_note')};
+  if(code) Object.assign(p.tasks.find(t=>t.code===code),data);
+  else{ p.tasks.push(Object.assign({logs:[]},data)); p.tasks.sort((a,b)=>cmpCode(a.code,b.code)); }
+  save(); closeModal(); render(); toast('已儲存');
+}
+function cmpCode(a,b){
+  const A=String(a).split('.').map(Number), B=String(b).split('.').map(Number);
+  for(let i=0;i<Math.max(A.length,B.length);i++){ const d=(A[i]||0)-(B[i]||0); if(d) return d; }
+  return 0;
+}
+function delTask(pid,code){
+  const p=DB.projects.find(x=>x.id===pid);
+  p.tasks=p.tasks.filter(t=>t.code!==code&&!t.code.startsWith(code+'.'));
+  p.files.forEach(f=>{ if(f.task===code){ f.task=''; f.cat='其他文件'; } });
+  save(); closeModal(); render(); toast('已刪除任務');
+}
+function addLog(pid,code){
+  const text=val('l_text'); if(!text) return toast('請輸入進度說明');
+  const t=DB.projects.find(x=>x.id===pid).tasks.find(t=>t.code===code);
+  (t.logs=t.logs||[]).push({ts:today(),who:val('l_who'),text});
+  save(); taskTab='logs'; render(); taskForm(pid,code); toast('已新增進度日誌');
+}
+function delLog(pid,code,i){
+  const t=DB.projects.find(x=>x.id===pid).tasks.find(t=>t.code===code);
+  t.logs.splice(i,1); save(); taskTab='logs'; render(); taskForm(pid,code);
+}
+
+/* ---- 文件 ---- */
+function addFile(pid){ fileForm(pid,null,''); }
+function addFileForTask(pid,code){ fileForm(pid,null,code); }
+function editFile(pid,fid){ fileForm(pid,fid); }
+function fileForm(pid,fid,presetTask){
+  const p=DB.projects.find(x=>x.id===pid);
+  const f=fid?p.files.find(x=>x.id===fid)
+            :{folder:curFolder||p.folders[0].id,cat:presetTask?'任務相關':'專案基本資料相關',task:presetTask||'',
+              name:'',no:'',type:'pdf',flowOwner:'',flow:'未送審',url:''};
+  modal(fid?'編輯文件':'新增文件',`<div class="modal-b">
+    <label class="field"><span>文件名稱 *</span><input id="d_name" value="${esc(f.name)}"></label>
+    <div class="row2">
+      <label class="field"><span>資料夾</span><select id="d_folder">${p.folders.map(o=>
+        `<option value="${o.id}" ${f.folder===o.id?'selected':''}>${o.parent?'　└ ':''}${esc(o.name)}</option>`).join('')}</select></label>
+      <label class="field"><span>文件編號</span><input id="d_no" value="${esc(f.no)}" placeholder="留空自動編號"></label>
+    </div>
+    <div class="row2">
+      <label class="field"><span>文件分類</span><select id="d_cat">${DOC_CATEGORY.map(c=>`<option ${f.cat===c?'selected':''}>${c}</option>`).join('')}</select></label>
+      <label class="field"><span>關聯 WBS 任務</span><select id="d_task"><option value="">（不關聯）</option>
+        ${p.tasks.filter(t=>!t._sum).map(t=>`<option value="${t.code}" ${f.task===t.code?'selected':''}>${t.code} ${esc(t.name)}</option>`).join('')}</select></label>
+    </div>
+    <div class="row3">
+      <label class="field"><span>格式</span><input id="d_type" value="${esc(f.type)}" placeholder="pdf / dwg / xlsx"></label>
+      <label class="field"><span>流程執行者</span><input id="d_fo" value="${esc(f.flowOwner)}"></label>
+      <label class="field"><span>流程狀態</span><select id="d_flow">${FLOW_STATUS.map(s=>`<option ${f.flow===s?'selected':''}>${s}</option>`).join('')}</select></label>
+    </div>
+    <label class="field"><span>雲端硬碟連結</span><input id="d_url" value="${esc(f.url)}" placeholder="https://drive.google.com/…"></label>
+    <div class="muted" style="font-size:12px">檔案本體放公司雲端硬碟，這裡記錄索引、審核流程與所屬任務。</div>
+    </div>`,
+    `${fid?`<button class="btn gh dgr" style="margin-right:auto" onclick="delFile('${pid}','${fid}')">刪除</button>`:''}
+     <button class="btn" onclick="closeModal()">取消</button>
+     <button class="btn pri" onclick="saveFile('${pid}','${fid||''}')">儲存</button>`);
+}
+function saveFile(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid);
+  const name=val('d_name'); if(!name) return toast('請輸入文件名稱');
+  const folder=val('d_folder'), task=val('d_task');
+  const data={folder,name,no:val('d_no')||nextDocNo(p,folder),type:val('d_type'),
+    cat:task?'任務相關':val('d_cat'), task,
+    flowOwner:val('d_fo'),flow:val('d_flow'),url:val('d_url'),mt:Date.now()};
+  if(fid) Object.assign(p.files.find(f=>f.id===fid),data);
+  else p.files.push(Object.assign({id:uid()},data));
+  save(); closeModal(); render(); toast('已儲存');
+}
+function delFile(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid);
+  p.files=p.files.filter(f=>f.id!==fid); save(); closeModal(); render(); toast('已刪除');
+}
+function addFolder(pid){
+  const p=DB.projects.find(x=>x.id===pid);
+  modal('新增資料夾',`<div class="modal-b">
+    <div class="row2">
+      <label class="field"><span>編號 *</span><input id="k_id" placeholder="例 7000"></label>
+      <label class="field"><span>上層資料夾</span><select id="k_parent"><option value="">（最上層）</option>
+        ${p.folders.filter(f=>!f.parent).map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select></label>
+    </div>
+    <label class="field"><span>名稱 *</span><input id="k_name" placeholder="例 維運紀錄"></label></div>`,
+    `<button class="btn" onclick="closeModal()">取消</button>
+     <button class="btn pri" onclick="saveFolder('${pid}')">建立</button>`);
+}
+function saveFolder(pid){
+  const p=DB.projects.find(x=>x.id===pid);
+  const id=val('k_id'), nm=val('k_name');
+  if(!id||!nm) return toast('編號與名稱為必填');
+  if(p.folders.some(f=>f.id===id)) return toast('此編號已存在');
+  p.folders.push({id,name:id+' '+nm,parent:val('k_parent')});
+  p.folders.sort((a,b)=>a.id.localeCompare(b.id));
+  save(); closeModal(); render(); toast('資料夾已建立');
+}
+function addMember(pid){
+  modal('新增成員',`<div class="modal-b"><div class="row3">
+    <label class="field"><span>姓名 *</span><input id="m_name"></label>
+    <label class="field"><span>團隊身份</span><select id="m_role">${ROLES.map(r=>`<option ${r==='工作人員'?'selected':''}>${r}</option>`).join('')}</select></label>
+    <label class="field"><span>單位</span><input id="m_dept" placeholder="工程管理部"></label></div></div>`,
+    `<button class="btn" onclick="closeModal()">取消</button>
+     <button class="btn pri" onclick="saveMember('${pid}')">新增</button>`);
+}
+function saveMember(pid){
+  const nm=val('m_name'); if(!nm) return toast('請輸入姓名');
+  DB.projects.find(x=>x.id===pid).members.push({name:nm,role:val('m_role'),dept:val('m_dept')});
+  save(); closeModal(); render();
+}
+function delMember(pid,i){ DB.projects.find(x=>x.id===pid).members.splice(i,1); save(); render(); }
+
+/* ---- 備份 / 匯出 ---- */
+function openBackup(){
+  let size='—';
+  try{ size=((localStorage.getItem(KEY)||'').length/1024).toFixed(1)+' KB'; }catch(e){}
+  modal('資料備份與還原',`<div class="modal-b">
+    <p class="muted" style="font-size:13px;margin-top:0">資料存在這台電腦的瀏覽器中（約 ${size}）。
+      匯出的 JSON 可放公司雲端硬碟，換電腦時再匯入。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0">
+      <button class="btn pri" onclick="exportJSON()">⬇ 匯出全部資料 (JSON)</button>
+      <button class="btn" onclick="document.getElementById('imp').click()">⬆ 匯入 JSON</button>
+      <input type="file" id="imp" accept="application/json" style="display:none" onchange="importJSON(this)">
+    </div>
+    <div class="muted" style="font-size:12.5px;border-top:1px solid var(--line-2);padding-top:12px">
+      共 ${DB.projects.length} 個專案、${DB.projects.reduce((a,p)=>a+p.tasks.length,0)} 項任務、
+      ${DB.projects.reduce((a,p)=>a+p.files.length,0)} 筆文件、
+      ${DB.projects.reduce((a,p)=>a+p.tasks.reduce((b,t)=>b+(t.logs||[]).length,0),0)} 筆進度日誌、
+      ${DB.projects.reduce((a,p)=>a+(p.forms||[]).length,0)} 份表單（${(DB.formTpls||[]).length} 個範本）。
+    </div></div>`,`<button class="btn" onclick="closeModal()">關閉</button>`);
+}
+function download(name,text,mime){
+  const b=new Blob(['﻿'+text],{type:mime||'text/plain;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function exportJSON(){
+  const clean=JSON.parse(JSON.stringify(DB,(k,v)=>k.startsWith('_')?undefined:v));
+  download(`專案管理備份_${today()}.json`,JSON.stringify(clean,null,2),'application/json');
+  toast('已匯出，請放到雲端硬碟');
+}
+function importJSON(el){
+  const f=el.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+      const d=JSON.parse(r.result); if(!d.projects) throw 0;
+      DB=migrate(d); save(); closeModal(); render(); toast(`已匯入 ${d.projects.length} 個專案`);
+    }catch(e){ toast('檔案格式不正確'); } };
+  r.readAsText(f);
+}
+function exportCSV(pid){
+  const p=DB.projects.find(x=>x.id===pid);
+  const head=['編碼','任務名稱','權重','進度模型','原定工期','前置任務','預定開始','預定完成',
+    '實際開始','實際完成','預期完成','預定進度%','實際進度%','偏差%','狀態','浮時','負責人','執行人','最新進度說明'];
+  const rows=p.tasks.map(t=>{
+    const last=(t.logs||[]).slice().sort((a,b)=>String(b.ts).localeCompare(String(a.ts)))[0];
+    return [t.code,t.name,t.weight,t._sum?'':t.model,t._sum?'':t.dur,t.deps||'',
+      fmt(t._s),fmt(t._e),t.actStart||'',t.actEnd||'',t.expEnd||'',
+      pct(t._plan),pct(t._prog),pct(variance(t)),t._sum?'':taskStatus(t).k,
+      t._sum?'':(t._float>=0?t._float:0),t.owner||'',t.exec||'',last?`[${last.ts}] ${last.text}`:''];
+  });
+  const csv=[head,...rows].map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  download(`${p.name}_進度_${today()}.csv`,csv,'text/csv;charset=utf-8');
+}
+
+function toggleSide(){
+  const s=$('#side'), m=$('#sideMask');
+  const on=!s.classList.contains('open');
+  s.classList.toggle('open',on); m.classList.toggle('on',on);
+}
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',cur);
+  DB.settings=DB.settings||{}; DB.settings.theme=cur; save();
+}
+function toast(m){
+  const d=document.createElement('div'); d.className='toast'; d.textContent=m;
+  document.body.appendChild(d); setTimeout(()=>d.remove(),2200);
+}
+
+document.documentElement.setAttribute('data-theme',(DB.settings&&DB.settings.theme)||'light');
+if(location.hash&&location.hash.startsWith('#/')) CURHASH=location.hash;
+parseHash(); render();
+// 開場就先測一次能不能存檔，不要等使用者改了一堆才發現
+setTimeout(()=>{
+  try{ localStorage.setItem(KEY+'_t','1'); localStorage.removeItem(KEY+'_t'); }
+  catch(e){ CAN_SAVE=false; warnNoSave(); }
+},400);
+</script>
+</body>
+</html>
