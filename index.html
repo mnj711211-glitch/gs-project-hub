@@ -1219,7 +1219,7 @@ function viewGantt(p){
           <span class="g-name" title="${esc(t.name)}" ${t._sum?'':`onclick="editTask('${p.id}','${t.code}')"`}>${esc(t.name)}</span>
         </div>`).join('')}</div>
     </div>
-    <div class="g-right" id="gr" onscroll="document.getElementById('glb').style.transform='translateY(-'+this.scrollTop+'px)'">
+    <div class="g-right" id="gr" onscroll="gScroll(this)">
       <div class="g-canvas" style="width:${total*W}px">
         <div class="g-head" style="width:${total*W}px;display:block;height:52px">
           <div class="g-months">${months.map(m=>`<div class="g-month" style="width:${m.n*W}px">${m.label}</div>`).join('')}</div>
@@ -1251,6 +1251,11 @@ function viewGantt(p){
       </div>
     </div>
   </div>`;
+}
+/** 左側任務欄跟著右側時間軸捲動；切走分頁後 #glb 已不存在，要擋掉 */
+function gScroll(el){
+  const b=document.getElementById('glb');
+  if(b) b.style.transform='translateY(-'+el.scrollTop+'px)';
 }
 /** 開啟甘特圖時自動捲到今天 */
 function syncGantt(){
