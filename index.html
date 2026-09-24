@@ -251,6 +251,27 @@ table.tbl tbody tr:last-child td{border-bottom:none}
   .modal-f .btn[style*="margin-right:auto"]{flex:1 1 100%;margin-right:0!important}
   .cklist{overflow:hidden}
 }
+/* 照片 */
+.phs{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:8px}
+.ph{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel-2);
+  aspect-ratio:4/3}
+.ph img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.ph .x{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;
+  background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:22px;padding:0}
+.ph .sz{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;
+  font-size:10.5px;padding:2px 5px;font-variant-numeric:tabular-nums}
+.ph-add{border:1.5px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;cursor:pointer;color:var(--txt-3);
+  font-size:12px;aspect-ratio:4/3;background:var(--panel)}
+.ph-add:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.ph-add b{font-size:20px;font-weight:400;line-height:1}
+.ck-p{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 9px;
+  cursor:pointer;font-size:12.5px;color:var(--txt-2);white-space:nowrap}
+.ck-p.has{border-color:var(--brand);color:var(--brand);background:var(--brand-soft);font-weight:600}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:500;display:flex;
+  align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+.lightbox .cap{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#eee;font-size:12.5px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .filters select,.filters input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);outline:none}
 .nosave{position:fixed;left:0;right:0;bottom:0;z-index:400;background:var(--warn-soft);
@@ -547,6 +568,7 @@ function migrate(db){
     p.calendarMode = p.calendarMode || 'cal';
     p.members = p.members || [];
     p.forms = p.forms || [];
+    p.forms.forEach(f=>{ f.photos = f.photos || []; });
     (p.tasks||[]).forEach(t=>{
       if(t.weight==null) t.weight = STAGE_WEIGHT[t.code] ?? 10;
       if(!t.model) t.model = /^收款/.test(t.name) ? '開工法' : '比例法';
@@ -1412,7 +1434,7 @@ function viewForms(p){
     ${list.length?`<table class="tbl">
       <thead><tr><th style="width:36px"></th><th style="width:84px">編號</th><th>表單</th>
         <th style="width:104px">日期</th><th style="width:150px">關聯任務</th>
-        <th style="width:90px">填表人</th><th style="width:76px">不合格</th>
+        <th style="width:90px">填表人</th><th style="width:62px">照片</th><th style="width:76px">不合格</th>
         <th style="width:82px">狀態</th><th style="width:44px"></th></tr></thead>
       <tbody>${list.map(f=>{const t=tpl(f.tpl),n=ngCount(f);return `<tr>
         <td style="font-size:17px">${t.icon||'🗒'}</td>
@@ -1422,6 +1444,7 @@ function viewForms(p){
         <td>${f.task?`<span class="link" style="font-size:12.5px" onclick="editTask('${p.id}','${f.task}')">
               <span class="tag">${f.task}</span> ${esc((p._map[f.task]||{}).name||'')}</span>`:'<span class="muted">—</span>'}</td>
         <td class="muted" style="font-size:12.5px">${esc(f.by||'')}</td>
+        <td class="muted" style="font-size:12.5px">${(f.photos||[]).length?'📷 '+f.photos.length:'—'}</td>
         <td>${n?`<span class="pill late">${n} 項</span>`:'<span class="muted">—</span>'}</td>
         <td><span class="pill ${f.status==='已核准'?'ok':f.status==='已送出'?'run':f.status==='退件'?'late':''}">${f.status}</span></td>
         <td><button class="btn sm gh" onclick="openForm('${p.id}','${f.id}')">⋯</button></td>
@@ -1447,11 +1470,100 @@ function pickForm(pid){
       </div>`).join('')}
     </div>`,`<button class="btn" onclick="closeModal()">取消</button>`,true);
 }
+/* ---------- 照片：上傳即壓縮 ---------- */
+const PH_MAX=1280, PH_Q=0.72;          // 長邊上限 / JPEG 品質
+function loadImg(file){
+  return new Promise((res,rej)=>{
+    const i=new Image(), u=URL.createObjectURL(file);
+    i.onload=()=>{ URL.revokeObjectURL(u); res(i); };
+    i.onerror=e=>{ URL.revokeObjectURL(u); rej(e); };
+    i.src=u;
+  });
+}
+/** 縮到長邊 1280px、轉 JPEG，直接砍掉九成以上容量 */
+async function compressImage(file){
+  let src;
+  try{ src=await createImageBitmap(file,{imageOrientation:'from-image'}); }
+  catch(e){ src=await loadImg(file); }
+  let w=src.width||src.naturalWidth, h=src.height||src.naturalHeight;
+  const scale=Math.min(1, PH_MAX/Math.max(w,h));
+  w=Math.max(1,Math.round(w*scale)); h=Math.max(1,Math.round(h*scale));
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);        // 去掉 PNG 透明底，避免轉 JPEG 變黑
+  ctx.drawImage(src,0,0,w,h);
+  if(src.close) src.close();
+  return {data:c.toDataURL('image/jpeg',PH_Q), w, h};
+}
+function dataSize(d){ return Math.round((d||'').length*0.75); }
+function kb(n){ return n<1024*1024 ? (n/1024).toFixed(0)+' KB' : (n/1048576).toFixed(1)+' MB'; }
+
+/** 選檔 → 壓縮 → 存進表單。item 為檢查項索引，null 代表一般照片 */
+function pickPhotos(pid,fid,item){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+  inp.onchange=async()=>{
+    const files=[...inp.files]; if(!files.length) return;
+    const p=DB.projects.find(x=>x.id===pid), f=p.forms.find(x=>x.id===fid);
+    stashForm(pid,fid);                                // 先把已填欄位存住，重畫才不會掉
+    toast(`壓縮中…（${files.length} 張）`);
+    let before=0, after=0, fail=0;
+    for(const file of files){
+      if(!/^image\//.test(file.type)){ fail++; continue; }
+      try{
+        const r=await compressImage(file);
+        before+=file.size; after+=dataSize(r.data);
+        (f.photos=f.photos||[]).push({id:uid(),name:file.name,data:r.data,
+          w:r.w,h:r.h,size:dataSize(r.data),item:(item==null?null:item),at:Date.now()});
+      }catch(e){ fail++; }
+    }
+    save(); openForm(pid,fid);
+    toast(fail? `${fail} 張讀取失敗，其餘已加入`
+              : `已加入 ${files.length} 張：${kb(before)} → ${kb(after)}`);
+  };
+  inp.click();
+}
+function delPhoto(pid,fid,phid){
+  const f=DB.projects.find(x=>x.id===pid).forms.find(x=>x.id===fid);
+  stashForm(pid,fid);
+  f.photos=(f.photos||[]).filter(x=>x.id!==phid);
+  save(); openForm(pid,fid); toast('已刪除照片');
+}
+function zoomPhoto(pid,fid,phid){
+  const f=DB.projects.find(x=>x.id===pid).forms.find(x=>x.id===fid);
+  const ph=(f.photos||[]).find(x=>x.id===phid); if(!ph) return;
+  const d=document.createElement('div');
+  d.className='lightbox';
+  d.innerHTML=`<img src="${ph.data}" alt=""><div class="cap">${esc(ph.name)}　${ph.w}×${ph.h}　${kb(ph.size)}</div>`;
+  d.onclick=()=>d.remove();
+  document.body.appendChild(d);
+}
+/** 不做必填檢查，只把目前畫面上的欄位值收進資料，供重畫後還原 */
+function stashForm(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid), f=p.forms.find(x=>x.id===fid), t=tpl(f.tpl);
+  const d=Object.assign({},f.data||{});
+  t.fields.forEach(x=>{ const e=document.getElementById('ff_'+x.k); if(e) d[x.k]=e.value.trim(); });
+  f.data=d;
+  const ts=document.getElementById('ff_task'), st=document.getElementById('ff_status');
+  if(ts) f.task=ts.value; if(st) f.status=st.value;
+}
+function photoBox(pid,fid,list,addLabel){
+  return `<div class="phs">
+    ${list.map(ph=>`<div class="ph">
+      <img src="${ph.data}" alt="${esc(ph.name)}" onclick="zoomPhoto('${pid}','${fid}','${ph.id}')">
+      <button class="x" title="刪除" onclick="delPhoto('${pid}','${fid}','${ph.id}')">✕</button>
+      <div class="sz">${ph.w}×${ph.h}　${kb(ph.size)}</div>
+    </div>`).join('')}
+    <div class="ph-add" onclick="pickPhotos('${pid}','${fid}',${addLabel==null?'null':addLabel})">
+      <b>＋</b>加照片</div>
+  </div>`;
+}
+
 function nextFormNo(p){ return 'F-'+String(p.forms.length+1).padStart(4,'0'); }
 function newForm(pid,tplId){
   const p=DB.projects.find(x=>x.id===pid);
   const f={id:uid(),tpl:tplId,task:'',status:'草稿',no:nextFormNo(p),by:'',at:Date.now(),
-           data:{date:today()},checks:{}};
+           data:{date:today()},checks:{},photos:[]};
   p.forms.push(f); save(); openForm(pid,f.id);
 }
 /** 填寫／檢視表單（手機也好按） */
@@ -1469,18 +1581,25 @@ function openForm(pid,fid){
       <input id="${id}" type="${x.t==='date'?'date':x.t==='num'?'number':'text'}" value="${esc(v)}"></label>`;
   };
   const heads=t.fields.filter(x=>x.t!=='area'), areas=t.fields.filter(x=>x.t==='area');
+  const allPh=f.photos||[];
   const checks=(t.items||[]).map((it,i)=>{
     const c=(f.checks||{})[i]||{r:'',note:''};
+    const ip=allPh.filter(x=>x.item===i);
     return `<div class="ck">
       <div class="ck-t">${i+1}. ${esc(it)}</div>
       <div class="ck-r">
         ${[['ok','合格'],['ng','不合格'],['na','不適用']].map(([k,l])=>
           `<button type="button" class="ck-b ${k} ${c.r===k?'on':''}" onclick="setCheck('${pid}','${fid}',${i},'${k}')">${l}</button>`).join('')}
+        <button type="button" class="ck-p ${ip.length?'has':''}" title="這一項的照片"
+          onclick="pickPhotos('${pid}','${fid}',${i})">📷${ip.length||''}</button>
       </div>
       <input class="ck-n" id="cn_${i}" placeholder="備註" value="${esc(c.note||'')}"
         onchange="setCheckNote('${pid}','${fid}',${i},this.value)">
+      ${ip.length?`<div style="grid-column:1/-1">${photoBox(pid,fid,ip,i)}</div>`:''}
     </div>`;
   }).join('');
+  const genPh=allPh.filter(x=>x.item==null);
+  const totalPh=allPh.reduce((a,x)=>a+(x.size||0),0);
 
   modal(`${t.icon||'🗒'} ${esc(t.name)}　<span class="muted" style="font-weight:400;font-size:12.5px">${esc(f.no)}</span>`,
    `<div class="modal-b">
@@ -1499,6 +1618,13 @@ function openForm(pid,fid){
           <button class="btn sm" onclick="allCheck('${pid}','${fid}','ok')">全部合格</button>
           <button class="btn sm gh" onclick="allCheck('${pid}','${fid}','')">清除</button></div>
         <div class="cklist">${checks}</div>`:''}
+
+      <div style="font-size:12px;font-weight:600;color:var(--txt-2);margin:16px 0 4px;
+        display:flex;align-items:center;gap:10px">現場照片
+        ${allPh.length?`<span class="pill">${allPh.length} 張　${kb(totalPh)}</span>`:''}
+        <span style="flex:1"></span>
+        <span class="muted" style="font-weight:400;font-size:11.5px">上傳時自動縮到長邊 ${PH_MAX}px</span></div>
+      ${photoBox(pid,fid,genPh,null)}
     </div>`,
    `<button class="btn gh dgr" style="margin-right:auto" onclick="delForm('${pid}','${fid}')">刪除</button>
     <button class="btn" onclick="printForm('${pid}','${fid}')">列印 / 存 PDF</button>
@@ -1545,10 +1671,14 @@ function printForm(pid,fid){
   const p=DB.projects.find(x=>x.id===pid), f=p.forms.find(x=>x.id===fid), t=tpl(f.tpl);
   const rows=t.fields.map(x=>`<tr><th>${esc(x.l)}</th><td>${esc((f.data||{})[x.k]||'')}</td></tr>`).join('');
   const lbl={ok:'合格',ng:'不合格',na:'不適用'};
+  const allPh=f.photos||[];
   const items=(t.items||[]).map((it,i)=>{const c=(f.checks||{})[i]||{};
-    return `<tr><td style="width:28px">${i+1}</td><td>${esc(it)}</td>
+    const n=allPh.filter(x=>x.item===i).length;
+    return `<tr><td style="width:28px">${i+1}</td><td>${esc(it)}${n?` <span style="color:#666;font-size:11px">（附 ${n} 張照片）</span>`:''}</td>
       <td style="width:70px;text-align:center;${c.r==='ng'?'color:#c0392b;font-weight:700':''}">${lbl[c.r]||''}</td>
       <td style="width:180px">${esc(c.note||'')}</td></tr>`;}).join('');
+  const photos=allPh.length?`<h2>現場照片</h2><div class="phs">${allPh.map(ph=>`
+    <figure><img src="${ph.data}" alt=""><figcaption>${ph.item!=null?`檢查項 ${ph.item+1}　`:''}${esc(ph.name)}</figcaption></figure>`).join('')}</div>`:'';
   const w=window.open('','_blank');
   if(!w) return toast('瀏覽器阻擋了新視窗，請允許彈出視窗');
   w.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
@@ -1561,6 +1691,11 @@ function printForm(pid,fid){
     .it th{background:#f2f4f6;width:auto;text-align:center}
     .sign{margin-top:36px;display:flex;gap:40px}
     .sign div{flex:1;border-top:1px solid #333;padding-top:6px;text-align:center;color:#555}
+    h2{font-size:14px;margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid #999}
+    .phs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .phs figure{margin:0;break-inside:avoid;page-break-inside:avoid}
+    .phs img{width:100%;border:1px solid #999;display:block}
+    .phs figcaption{font-size:10.5px;color:#555;padding-top:3px;word-break:break-all}
     @media print{body{padding:0}}
     </style></head><body>
     <h1>${esc(t.name)}</h1>
@@ -1569,6 +1704,7 @@ function printForm(pid,fid){
     <table>${rows}</table>
     ${items?`<table class="it"><thead><tr><th>#</th><th>檢查項目</th><th>結果</th><th>備註</th></tr></thead>
       <tbody>${items}</tbody></table>`:''}
+    ${photos}
     <div class="sign"><div>填表人</div><div>複核</div><div>核准</div></div>
     </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
@@ -1782,7 +1918,8 @@ function saveProject(id,isNew){
 function dupProject(id){
   const src=DB.projects.find(x=>x.id===id);
   const p=JSON.parse(JSON.stringify(src,(k,v)=>k.startsWith('_')?undefined:v));
-  p.id=uid(); p.name=src.name+'（複製）'; p.code=''; p.created=Date.now(); p.star=false; p.files=[];
+  p.id=uid(); p.name=src.name+'（複製）'; p.code=''; p.created=Date.now(); p.star=false;
+  p.files=[]; p.forms=[];                               // 文件與表單（含照片）不帶入新案
   p.tasks.forEach(t=>{ t.prog=0; t.actStart=''; t.actEnd=''; t.expEnd=''; t.logs=[]; });
   DB.projects.unshift(p); save(); go('#/p/'+p.id+'/overview'); toast('已複製（進度歸零、文件未帶入）');
 }
@@ -2012,6 +2149,14 @@ function saveMember(pid){
 function delMember(pid,i){ DB.projects.find(x=>x.id===pid).members.splice(i,1); save(); render(); }
 
 /* ---- 備份 / 匯出 ---- */
+/** 照片張數、照片總量、整體佔用 */
+function phStat(){
+  let n=0,b=0;
+  DB.projects.forEach(p=>(p.forms||[]).forEach(f=>(f.photos||[]).forEach(x=>{n++;b+=x.size||0;})));
+  let total=b;
+  try{ total=(localStorage.getItem(KEY)||'').length; }catch(e){}
+  return {n,b,total};
+}
 function openBackup(){
   let size='—';
   try{ size=((localStorage.getItem(KEY)||'').length/1024).toFixed(1)+' KB'; }catch(e){}
@@ -2027,7 +2172,20 @@ function openBackup(){
       共 ${DB.projects.length} 個專案、${DB.projects.reduce((a,p)=>a+p.tasks.length,0)} 項任務、
       ${DB.projects.reduce((a,p)=>a+p.files.length,0)} 筆文件、
       ${DB.projects.reduce((a,p)=>a+p.tasks.reduce((b,t)=>b+(t.logs||[]).length,0),0)} 筆進度日誌、
-      ${DB.projects.reduce((a,p)=>a+(p.forms||[]).length,0)} 份表單（${(DB.formTpls||[]).length} 個範本）。
+      ${DB.projects.reduce((a,p)=>a+(p.forms||[]).length,0)} 份表單（${(DB.formTpls||[]).length} 個範本）、
+      ${phStat().n} 張照片（${kb(phStat().b)}）。
+    </div>
+    ${(()=>{const s=phStat(), pctUsed=Math.min(100,Math.round(s.total/5242880*100));
+      return `<div style="margin-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:6px">
+          <span class="muted">瀏覽器容量</span>
+          <div class="bar" style="flex:1"><i style="width:${pctUsed}%;background:${pctUsed>80?'var(--danger)':'var(--brand)'}"></i></div>
+          <span class="num muted">${kb(s.total)} / 約 5 MB</span></div>
+        ${pctUsed>70?`<div class="muted" style="font-size:12px;color:var(--warn)">
+          ⚠ 已用 ${pctUsed}%，照片佔 ${kb(s.b)}。建議先匯出 JSON 備份，或刪掉舊表單的照片。</div>`
+        :`<div class="muted" style="font-size:12px">照片上傳時已自動壓縮，主要容量來自照片。</div>`}
+      </div>`;})()}
+    <div style="display:none">
     </div></div>`,`<button class="btn" onclick="closeModal()">關閉</button>`);
 }
 function download(name,text,mime){
