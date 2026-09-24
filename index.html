@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --bg:#f5f6f8; --panel:#ffffff; --panel-2:#fafbfc; --line:#e3e6ea; --line-2:#eef0f3;
@@ -272,6 +275,34 @@ table.tbl tbody tr:last-child td{border-bottom:none}
   align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
 .lightbox .cap{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#eee;font-size:12.5px}
+/* 登入牆 */
+.gate{position:fixed;inset:0;z-index:600;background:var(--bg);display:none;
+  align-items:center;justify-content:center;padding:20px}
+.gate.on{display:flex}
+.gate-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow-lg);padding:32px 30px;width:100%;max-width:380px;text-align:center}
+.gate-mark{width:48px;height:48px;border-radius:14px;margin:0 auto 14px;
+  background:linear-gradient(140deg,var(--brand),var(--brand-2));display:grid;place-items:center;
+  color:#fff;font-weight:700;font-size:17px;letter-spacing:.5px}
+.gate-card h1{font-size:18px;margin:0}
+.gate-sub{color:var(--txt-3);font-size:12px;margin:2px 0 22px;letter-spacing:.3px}
+.gate-msg{color:var(--txt-2);font-size:13px;margin-bottom:16px;line-height:1.6}
+.gate-msg.err{color:var(--danger)}
+.spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--brand);
+  border-radius:50%;animation:sp .7s linear infinite;margin:6px auto 14px}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* 雲端狀態 */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;
+  font-size:12px;font-weight:600;white-space:nowrap;cursor:default}
+.chip.on{background:var(--ok-soft);color:var(--ok)}
+.chip.off{background:var(--idle-soft);color:var(--txt-3)}
+.chip.sync{background:#e8effd;color:var(--accent)}
+:root[data-theme="dark"] .chip.sync{background:#1b2740}
+#authBox{display:flex;align-items:center;gap:8px}
+.who{font-size:12.5px;color:var(--txt-2);max-width:130px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ph.loading{display:grid;place-items:center;color:var(--txt-3);font-size:11.5px}
+@media(max-width:820px){ .who{display:none} }
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .filters select,.filters input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);outline:none}
 .nosave{position:fixed;left:0;right:0;bottom:0;z-index:400;background:var(--warn-soft);
@@ -305,7 +336,15 @@ table.tbl tbody tr:last-child td{border-bottom:none}
 </style>
 </head>
 <body>
-<div class="app">
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-mark">GS</div>
+    <h1>專案管理中心</h1>
+    <p class="gate-sub">EPC Project Hub</p>
+    <div id="gateBody"></div>
+  </div>
+</div>
+<div class="app" id="appRoot">
   <div class="side-mask" id="sideMask" onclick="toggleSide()"></div>
   <aside class="side" id="side">
     <div class="brand">
@@ -324,6 +363,7 @@ table.tbl tbody tr:last-child td{border-bottom:none}
       <div class="crumb" id="crumb"></div>
       <div class="sp"></div>
       <div class="search"><span class="ic">🔍</span><input id="q" placeholder="搜尋專案、任務、文件…" oninput="onSearch(this.value)"></div>
+      <div id="authBox"></div>
       <button class="btn pri" onclick="newProject()">＋ 新增專案</button>
     </header>
     <div id="tabs"></div>
@@ -540,9 +580,19 @@ function load(){
   return seed();
 }
 let CAN_SAVE=true;
-function save(){
+function save(){ saveLocal(); cloudSchedulePush(); }
+/**
+ * 本機備份。接上雲端後照片影像存在 Firestore，本機就不再留一份 base64，
+ * 否則幾十張照片很快就撐破瀏覽器約 5MB 的上限。
+ */
+function saveLocal(){
   try{
-    localStorage.setItem(KEY, JSON.stringify(DB,(k,v)=>k.startsWith('_')?undefined:v));
+    const json=JSON.stringify(DB,(k,v)=>{
+      if(k.startsWith('_')) return undefined;
+      if(k==='data' && cloudReady && typeof v==='string' && v.startsWith('data:image')) return undefined;
+      return v;
+    });
+    localStorage.setItem(KEY,json);
     if(!CAN_SAVE){ CAN_SAVE=true; const b=$('#nosave'); if(b) b.remove(); }
   }catch(e){
     if(CAN_SAVE){ CAN_SAVE=false; warnNoSave(); }
@@ -1513,8 +1563,10 @@ function pickPhotos(pid,fid,item){
       try{
         const r=await compressImage(file);
         before+=file.size; after+=dataSize(r.data);
-        (f.photos=f.photos||[]).push({id:uid(),name:file.name,data:r.data,
-          w:r.w,h:r.h,size:dataSize(r.data),item:(item==null?null:item),at:Date.now()});
+        const ph={id:uid(),name:file.name,data:r.data,
+          w:r.w,h:r.h,size:dataSize(r.data),item:(item==null?null:item),at:Date.now()};
+        (f.photos=f.photos||[]).push(ph);
+        cloudPutPhoto(ph,pid,fid);
       }catch(e){ fail++; }
     }
     save(); openForm(pid,fid);
@@ -1527,6 +1579,7 @@ function delPhoto(pid,fid,phid){
   const f=DB.projects.find(x=>x.id===pid).forms.find(x=>x.id===fid);
   stashForm(pid,fid);
   f.photos=(f.photos||[]).filter(x=>x.id!==phid);
+  cloudDelPhoto(phid);
   save(); openForm(pid,fid); toast('已刪除照片');
 }
 function zoomPhoto(pid,fid,phid){
@@ -1549,10 +1602,13 @@ function stashForm(pid,fid){
 }
 function photoBox(pid,fid,list,addLabel){
   return `<div class="phs">
-    ${list.map(ph=>`<div class="ph">
+    ${list.map(ph=>ph.data?`<div class="ph">
       <img src="${ph.data}" alt="${esc(ph.name)}" onclick="zoomPhoto('${pid}','${fid}','${ph.id}')">
       <button class="x" title="刪除" onclick="delPhoto('${pid}','${fid}','${ph.id}')">✕</button>
       <div class="sz">${ph.w}×${ph.h}　${kb(ph.size)}</div>
+    </div>`:`<div class="ph loading">
+      <div><div class="spin" style="width:18px;height:18px;border-width:2px;margin:0 auto 6px"></div>載入中…</div>
+      <button class="x" title="刪除" onclick="delPhoto('${pid}','${fid}','${ph.id}')">✕</button>
     </div>`).join('')}
     <div class="ph-add" onclick="pickPhotos('${pid}','${fid}',${addLabel==null?'null':addLabel})">
       <b>＋</b>加照片</div>
@@ -1630,6 +1686,7 @@ function openForm(pid,fid){
     <button class="btn" onclick="printForm('${pid}','${fid}')">列印 / 存 PDF</button>
     <button class="btn" onclick="closeModal()">取消</button>
     <button class="btn pri" onclick="saveForm('${pid}','${fid}')">儲存</button>`,true);
+  if(allPh.some(ph=>!ph.data)) hydratePhotos(pid,fid);   // 影像還在雲端就補抓
 }
 function setCheck(pid,fid,i,r){
   const f=DB.projects.find(x=>x.id===pid).forms.find(x=>x.id===fid);
@@ -1677,7 +1734,8 @@ function printForm(pid,fid){
     return `<tr><td style="width:28px">${i+1}</td><td>${esc(it)}${n?` <span style="color:#666;font-size:11px">（附 ${n} 張照片）</span>`:''}</td>
       <td style="width:70px;text-align:center;${c.r==='ng'?'color:#c0392b;font-weight:700':''}">${lbl[c.r]||''}</td>
       <td style="width:180px">${esc(c.note||'')}</td></tr>`;}).join('');
-  const photos=allPh.length?`<h2>現場照片</h2><div class="phs">${allPh.map(ph=>`
+  const ready=allPh.filter(ph=>ph.data);
+  const photos=ready.length?`<h2>現場照片</h2><div class="phs">${ready.map(ph=>`
     <figure><img src="${ph.data}" alt=""><figcaption>${ph.item!=null?`檢查項 ${ph.item+1}　`:''}${esc(ph.name)}</figcaption></figure>`).join('')}</div>`:'';
   const w=window.open('','_blank');
   if(!w) return toast('瀏覽器阻擋了新視窗，請允許彈出視窗');
@@ -2237,9 +2295,207 @@ function toast(m){
   document.body.appendChild(d); setTimeout(()=>d.remove(),2200);
 }
 
+/* =======================================================================
+   雲端同步（Firebase：Google 登入 + Firestore）
+   沿用業務戰情表同一個專案與同一份白名單 config/allowlist。
+   資料切法：
+     hubMeta/shared        表單範本與偏好設定
+     hubProjects/{id}      一個專案一份文件 —— 不同人改不同案子不會互相覆蓋
+     hubPhotos/{id}        照片各自一份，開表單時才抓，工地手機不用一次下載全部
+   ======================================================================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCheXV3qxfZIIP8h7AroLXvXk9f_8wq1B8",
+  authDomain: "gst-sales-war-room.firebaseapp.com",
+  projectId: "gst-sales-war-room",
+  storageBucket: "gst-sales-war-room.firebasestorage.app",
+  messagingSenderId: "1021641104092",
+  appId: "1:1021641104092:web:d1c8bb0298d70dc8b5b219"
+};
+const COL_META='hubMeta', COL_PROJ='hubProjects', COL_PHOTO='hubPhotos';
+const FB_ON = !/^PASTE/.test(FIREBASE_CONFIG.apiKey);
+let fbAuth=null, fbDb=null, fbUser=null, cloudReady=false, pushTimer=null;
+let unsubProj=null, unsubMeta=null;
+let lastPushed={};              // projectId -> 上次推上去的內容，沒變就不重送
+const photoCache={};            // photoId -> base64，避免重複下載
+let applyingRemote=false;       // 正在套用遠端資料，不要反彈回寫
+
+function gate(html,show){
+  const g=$('#gate'), b=$('#gateBody'), app=$('#appRoot');
+  if(b) b.innerHTML=html;
+  if(g) g.classList.toggle('on',show!==false);
+  if(app) app.style.display=(show===false)?'':'none';
+}
+function openApp(){ gate('',false); }
+const GATE_LOGIN=`<p class="gate-msg">請使用公司授權的 Google 帳號登入</p>
+  <button class="btn pri" style="width:100%;justify-content:center;padding:11px" onclick="cloudSignIn()">使用 Google 登入</button>
+  <p class="gate-msg" style="font-size:11.5px;margin:14px 0 0;color:var(--txt-3)">
+    未登入也能用，但資料只會留在這台裝置<br>
+    <span class="link" onclick="useLocalOnly()">以單機模式繼續</span></p>`;
+const GATE_CHECK=`<div class="spin"></div><p class="gate-msg">驗證帳號權限中…</p>`;
+
+function cloudInit(){
+  renderAuthUI();
+  if(!FB_ON || typeof firebase==='undefined'){ openApp(); return; }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth=firebase.auth(); fbDb=firebase.firestore();
+    fbAuth.onAuthStateChanged(u=>{
+      fbUser=u; renderAuthUI();
+      if(u){ gate(GATE_CHECK,true); checkAllowlist(u); }
+      else{ teardownCloud(); gate(GATE_LOGIN,true); }
+    });
+  }catch(e){ console.error('[cloud] 初始化失敗',e); toast('雲端初始化失敗，改用單機模式'); openApp(); }
+}
+window.useLocalOnly=function(){ openApp(); toast('單機模式：資料只存在這台裝置'); };
+window.cloudSignIn=function(){
+  if(!fbAuth) return toast('雲端尚未設定');
+  fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .catch(e=>{ console.error(e); gate(GATE_LOGIN.replace('請使用公司授權的 Google 帳號登入',
+      '登入失敗：'+(e.code||e.message)),true); });
+};
+window.cloudSignOut=function(){ if(fbAuth) fbAuth.signOut(); };
+function teardownCloud(){
+  if(unsubProj){unsubProj();unsubProj=null;}
+  if(unsubMeta){unsubMeta();unsubMeta=null;}
+  cloudReady=false; lastPushed={}; renderAuthUI();
+}
+/** 白名單沿用戰情表那份，名單外的帳號看不到資料 */
+function checkAllowlist(u){
+  fbDb.collection('config').doc('allowlist').get().then(snap=>{
+    const emails=(snap.exists && snap.data().emails)||[];
+    if(emails.length && !emails.includes(u.email)){
+      gate(`<p class="gate-msg err">帳號 ${esc(u.email)} 尚未被授權<br>請聯絡管理員加入白名單</p>
+        <button class="btn" style="width:100%;justify-content:center" onclick="cloudSignOut()">換一個帳號</button>`,true);
+      return;
+    }
+    subscribeCloud(); openApp();
+  }).catch(e=>{
+    console.error('[cloud] 白名單讀取失敗',e);
+    gate(`<p class="gate-msg err">無法讀取權限設定<br>${esc(e.code||e.message)}</p>
+      <button class="btn" style="width:100%;justify-content:center;margin-bottom:8px" onclick="location.reload()">重試</button>
+      <span class="link" onclick="useLocalOnly()">以單機模式繼續</span>`,true);
+  });
+}
+function subscribeCloud(){
+  unsubMeta=fbDb.collection(COL_META).doc('shared').onSnapshot(snap=>{
+    if(snap.metadata.hasPendingWrites || !snap.exists) return;
+    try{
+      const m=JSON.parse(snap.data().json||'{}');
+      applyingRemote=true;
+      if(m.formTpls) DB.formTpls=m.formTpls;
+      applyingRemote=false; render();
+    }catch(e){ console.error('[cloud] meta 解析失敗',e); }
+  },err=>console.error('[cloud] meta 監聽錯誤',err));
+
+  unsubProj=fbDb.collection(COL_PROJ).onSnapshot(snap=>{
+    if(snap.metadata.hasPendingWrites) return;
+    applyingRemote=true;
+    let changed=0;
+    snap.docChanges().forEach(ch=>{
+      const id=ch.doc.id;
+      if(ch.type==='removed'){
+        DB.projects=DB.projects.filter(p=>p.id!==id); delete lastPushed[id]; changed++; return;
+      }
+      try{
+        const rp=JSON.parse(ch.doc.data().json);
+        const i=DB.projects.findIndex(p=>p.id===id);
+        if(i>=0) DB.projects[i]=rp; else DB.projects.push(rp);
+        lastPushed[id]=ch.doc.data().json; changed++;
+      }catch(e){ console.error('[cloud] 專案解析失敗',id,e); }
+    });
+    migrate(DB);
+    cloudReady=true; applyingRemote=false;
+    saveLocal(); renderAuthUI();
+    if(changed){ render(); if(!snap.metadata.fromCache && snap.docChanges().length) toast('已同步雲端最新資料'); }
+    if(!snap.empty) return;
+    pushAll();                       // 雲端還是空的 → 把本機資料當成第一份上傳
+  },err=>{
+    console.error('[cloud] 專案監聽錯誤',err);
+    toast('雲端連線錯誤：'+(err.code||''));
+  });
+}
+/** 存檔時只送「真的有變」的專案，省流量也降低互相覆蓋的機會 */
+function pushCloud(){
+  if(!fbDb||!fbUser||!cloudReady) return;
+  const stamp=firebase.firestore.FieldValue.serverTimestamp();
+  const by=(fbUser.email||fbUser.uid||'');
+  const alive={};
+  DB.projects.forEach(p=>{
+    alive[p.id]=1;
+    const json=JSON.stringify(stripPhotos(p));
+    if(lastPushed[p.id]===json) return;
+    lastPushed[p.id]=json;
+    fbDb.collection(COL_PROJ).doc(p.id).set({json,updatedAt:stamp,updatedBy:by})
+      .catch(e=>{ console.error('[cloud] 寫入失敗',p.id,e); toast('雲端儲存失敗'); });
+  });
+  Object.keys(lastPushed).forEach(id=>{      // 本機刪掉的，雲端也刪
+    if(!alive[id]){ delete lastPushed[id]; fbDb.collection(COL_PROJ).doc(id).delete().catch(()=>{}); }
+  });
+  const meta=JSON.stringify({formTpls:DB.formTpls});
+  if(lastPushed.__meta!==meta){
+    lastPushed.__meta=meta;
+    fbDb.collection(COL_META).doc('shared').set({json:meta,updatedAt:stamp,updatedBy:by}).catch(()=>{});
+  }
+}
+function pushAll(){ lastPushed={}; pushCloud(); }
+function cloudSchedulePush(){
+  if(!cloudReady||!fbUser||applyingRemote) return;
+  clearTimeout(pushTimer); pushTimer=setTimeout(pushCloud,1200);
+}
+/** 專案裡的照片只留描述，影像本體另外放 hubPhotos */
+function stripPhotos(p){
+  const c=JSON.parse(JSON.stringify(p,(k,v)=>k.startsWith('_')?undefined:v));
+  (c.forms||[]).forEach(f=>(f.photos||[]).forEach(ph=>{ delete ph.data; }));
+  return c;
+}
+/** 照片上傳：影像存雲端，本機只留描述 */
+function cloudPutPhoto(ph,pid,fid){
+  photoCache[ph.id]=ph.data;
+  if(!fbDb||!fbUser||!cloudReady) return;
+  fbDb.collection(COL_PHOTO).doc(ph.id).set({
+    data:ph.data, project:pid, form:fid, name:ph.name||'',
+    at:firebase.firestore.FieldValue.serverTimestamp(),
+    by:(fbUser.email||'')
+  }).catch(e=>{ console.error('[cloud] 照片上傳失敗',e); toast('照片上傳失敗：'+(e.code||'')); });
+}
+function cloudDelPhoto(id){
+  delete photoCache[id];
+  if(fbDb&&fbUser&&cloudReady) fbDb.collection(COL_PHOTO).doc(id).delete().catch(()=>{});
+}
+/** 開表單時才補抓缺少影像的照片 */
+async function hydratePhotos(pid,fid){
+  const p=DB.projects.find(x=>x.id===pid); if(!p) return;
+  const f=(p.forms||[]).find(x=>x.id===fid); if(!f) return;
+  const need=(f.photos||[]).filter(ph=>!ph.data);
+  if(!need.length) return;
+  let got=0;
+  for(const ph of need){
+    if(photoCache[ph.id]){ ph.data=photoCache[ph.id]; got++; continue; }
+    if(!fbDb||!cloudReady) continue;
+    try{
+      const s=await fbDb.collection(COL_PHOTO).doc(ph.id).get();
+      if(s.exists){ ph.data=s.data().data; photoCache[ph.id]=ph.data; got++; }
+    }catch(e){ console.error('[cloud] 照片下載失敗',ph.id,e); }
+  }
+  if(got && $('#modal').innerHTML) openForm(pid,fid);
+}
+function renderAuthUI(){
+  const b=$('#authBox'); if(!b) return;
+  if(!FB_ON||typeof firebase==='undefined'){
+    b.innerHTML=`<span class="chip off" title="未設定雲端，資料只存在這台裝置">● 單機</span>`; return;
+  }
+  if(fbUser){
+    b.innerHTML=`<span class="chip ${cloudReady?'on':'sync'}" title="${cloudReady?'雲端即時同步中':'連線中'}">● ${cloudReady?'已同步':'連線中'}</span>
+      <span class="who" title="${esc(fbUser.email||'')}">${esc(fbUser.displayName||fbUser.email||'')}</span>
+      <button class="btn sm gh" onclick="cloudSignOut()">登出</button>`;
+  }else{
+    b.innerHTML=`<button class="btn sm" onclick="cloudSignIn()">登入以同步</button>`;
+  }
+}
+
 document.documentElement.setAttribute('data-theme',(DB.settings&&DB.settings.theme)||'light');
 if(location.hash&&location.hash.startsWith('#/')) CURHASH=location.hash;
-parseHash(); render();
+parseHash(); render(); cloudInit();
 // 開場就先測一次能不能存檔，不要等使用者改了一堆才發現
 setTimeout(()=>{
   try{ localStorage.setItem(KEY+'_t','1'); localStorage.removeItem(KEY+'_t'); }
