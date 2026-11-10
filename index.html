@@ -333,6 +333,16 @@ table.tbl tbody tr:last-child td{border-bottom:none}
   .search input{width:110px}
   .kpis{grid-template-columns:1fr 1fr}
 }
+.flowcard{margin-bottom:14px}
+.flow{display:flex;gap:6px;padding:12px;overflow-x:auto}
+.flow-s{flex:1;min-width:118px;padding:9px 11px;border-radius:9px;background:var(--line-2)}
+.flow-s.done{background:var(--brand-soft)}
+.flow-s.now{background:var(--brand);color:#fff}
+.flow-n{font-weight:700;font-size:13px}
+.flow-m{font-size:11.5px;opacity:.8;margin-top:2px}
+.flow-l{display:inline-block;margin-top:5px;font-size:11.5px;color:inherit;text-decoration:underline}
+.flow-l.off{opacity:.55;text-decoration:none}
+.srcnote{background:var(--brand-soft);border-radius:8px;padding:8px 12px;font-size:12.5px;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -565,6 +575,106 @@ const FORM_TEMPLATES = [
             {k:'witness',l:'會同人員',t:'text'}],
     items})),
 ];
+
+/* ======================= 各部門戰情室 ======================= */
+const SALES_URL='https://gst-sales-war-room.web.app/';
+const EPC_URL='https://relaxbao-netizen.github.io/green-source-epc/';
+const OM_URL='https://mnj711211-glitch.github.io/bess-yield-expert/ess-operation-dashboard.html';
+const SRC_SALES='業務戰情';
+let SALES=null;   // 業務戰情表的請款合約（雲端登入後才有）
+
+/**
+ * 業務在業務戰情表的合約上選了「對應專案」，這裡就自動帶入：
+ *   1.2 簽約、1.3 啟始會議、各期收款（名稱有「買賣」→1.4~1.8，其餘→承攬 1.9~1.13）、合約連結。
+ * 收款以業務戰情為準，這邊只讀；同一筆資料大家的瀏覽器算出來都一樣，重複寫入也不會打架。
+ */
+function salesContracts(pid){ return ((SALES&&SALES.billing)||[]).filter(c=>c.hubId===pid); }
+function salesTermValues(c){
+  const amt=+c.amount||0, ts=c.terms||[]; let acc=0;
+  return ts.map((t,i)=>{ const v=i===ts.length-1?amt-acc:Math.round(amt*(+t.pct||0)/100); acc+=v; return {...t,value:v}; });
+}
+function applySales(){
+  if(!SALES||!cloudReady) return 0;
+  let changed=0;
+  DB.projects.forEach(p=>{
+    const cs=salesContracts(p.id);
+    const meta=cs.map(c=>({id:c.id,name:c.name||'',amount:+c.amount||0,url:c.contractUrl||'',kickoff:c.kickoff||'',
+      paid:salesTermValues(c).filter(t=>t.paid).reduce((a,t)=>a+t.value,0)}));
+    if(JSON.stringify(p.contracts||[])!==JSON.stringify(meta)){ p.contracts=meta; changed++; }
+    if(!cs.length) return;
+    const set=(code,o,note)=>{
+      const t=p.tasks.find(x=>x.code===code); if(!t) return;
+      if(t.src!==SRC_SALES){ t.src=SRC_SALES; changed++; }
+      const diff=Object.keys(o).filter(k=>(t[k]??'')!==o[k]);
+      if(!diff.length) return;
+      diff.forEach(k=>t[k]=o[k]);
+      t.logs=(t.logs||[]).filter(l=>!(l.auto&&l.ts===today()));
+      t.logs.push({ts:today(),who:'🤖'+SRC_SALES,text:note,auto:true});
+      changed++;
+    };
+    set('1.2',{prog:100},'業務戰情：已簽約');
+    const k=cs.map(c=>c.kickoff).filter(Boolean).sort()[0];
+    if(k) set('1.3',{prog:100,actStart:k,actEnd:k},'業務戰情：啟始會議 '+k);
+    cs.forEach(c=>{
+      const base=/買賣/.test(c.name||'')?4:9;
+      salesTermValues(c).slice(0,5).forEach((t,i)=>{
+        const o={prog:t.paid?100:0,actEnd:t.paid?(t.date||''):''};
+        if(t.date){ o.planStart=t.date; o.planEnd=t.date; }
+        set('1.'+(base+i),o,`業務戰情：${t.label} ${t.pct}%　${t.value.toLocaleString()} 元　`
+          +(t.paid?'已收款':t.invDate?'已開發票 '+t.invDate:'未收'));
+      });
+    });
+  });
+  if(changed){ saveLocal(); cloudSchedulePush(); }
+  return changed;
+}
+
+/** 案子現在走到哪個部門：業務 → 啟始會議 → 設計 → 跑件 → 採購 → 工程 → 維運 */
+function flowSteps(p){
+  const prog=c=>{ const t=p.tasks.find(x=>x.code===c); return t?Math.round(t._prog??t.prog??0):0; };
+  const c0=(p.contracts||[])[0];
+  const sales=c0?SALES_URL+'#billing/'+encodeURIComponent(c0.id):SALES_URL;
+  const steps=[
+    {n:'業務簽約',d:'業務',v:prog('1.2'),url:sales},
+    {n:'啟始會議',d:'業務',v:prog('1.3'),url:sales},
+    {n:'設計出圖・採購清單',d:'設計',v:prog('2'),url:''},
+    {n:'跑件申辦',d:'PM',v:prog('3'),url:''},
+    {n:'採購發包',d:'採購',v:prog('4'),url:''},
+    {n:'工程施工',d:'工程',v:prog('5'),url:EPC_URL},
+    {n:'驗收・維運承接',d:'維運',v:prog('6'),url:OM_URL},
+  ];
+  const cur=steps.findIndex(s=>s.v<100);
+  steps.forEach((s,i)=>s.st=s.v>=100?'done':i===cur?'now':'todo');
+  return steps;
+}
+function flowHTML(p){
+  return `<div class="card flowcard"><div class="flow">${flowSteps(p).map(s=>`
+    <div class="flow-s ${s.st}">
+      <div class="flow-n">${s.st==='done'?'✓ ':''}${esc(s.n)}</div>
+      <div class="flow-m">${esc(s.d)}　${s.st==='done'?'完成':s.v>0?s.v+'%':'未開始'}</div>
+      ${s.url?`<a class="flow-l" href="${s.url}" target="_blank" rel="noopener">開啟${esc(s.d)}戰情 ↗</a>`
+             :`<span class="flow-l off">戰情室待建</span>`}
+    </div>`).join('')}</div></div>`;
+}
+function contractsHTML(p){
+  const cs=p.contracts||[];
+  if(!SALES) return `<div class="empty">登入雲端後顯示業務戰情表的合約</div>`;
+  if(!cs.length) return `<div class="empty">業務戰情表還沒有合約對應到這個專案<br>
+    <a class="link" href="${SALES_URL}#billing" target="_blank" rel="noopener">到業務戰情表「請款里程碑」編輯合約，選擇對應專案 ↗</a></div>`;
+  return `<div style="padding:12px 16px">${cs.map(c=>`
+    <div style="padding:8px 0;border-bottom:1px solid var(--line-2)">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <b>${esc(c.name)}</b>
+        <span class="pill">${(c.amount/1e4).toLocaleString(undefined,{maximumFractionDigits:1})} 萬</span>
+        <span class="pill ${c.paid>=c.amount&&c.amount?'ok':''}">已收 ${c.amount?Math.round(c.paid/c.amount*100):0}%</span>
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap">
+        ${c.kickoff?`<span>啟始會議 ${esc(c.kickoff)}</span>`:''}
+        ${c.url?`<a class="link" href="${esc(c.url)}" target="_blank" rel="noopener">📎 合約掃描檔</a>`:'<span>尚未附合約檔</span>'}
+        <a class="link" href="${SALES_URL}#billing/${encodeURIComponent(c.id)}" target="_blank" rel="noopener">到業務戰情修改 ↗</a>
+      </div>
+    </div>`).join('')}</div>`;
+}
 
 /* =========================== 資料層 =========================== */
 const KEY='gs_pm_db_v3';
@@ -1087,6 +1197,7 @@ function viewOverview(p){
   recent.sort((a,b)=>String(b.l.ts).localeCompare(String(a.l.ts)));
 
   return `
+  ${flowHTML(p)}
   <div class="kpis" style="margin-bottom:16px">
     ${kpi('實際進度',pct(p._prog)+'%',`預定應達 ${pct(p._plan)}%`)}
     ${kpi('進度偏差',(v>=0?'+':'')+pct(v)+'%',v<-5?'落後，需檢討':v<0?'略為落後':'符合或超前',v<-5?'bad':v>=0?'good':'')}
@@ -1138,12 +1249,15 @@ function viewOverview(p){
       :`<div class="empty">還沒有任何進度日誌</div>`}
     </div>
     <div class="card">
-      <div class="card-h"><h3>收款里程碑</h3></div>
+      <div class="card-h"><h3>業務合約</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：業務戰情表</span></div>
+      ${contractsHTML(p)}
+      <div class="card-h" style="border-top:1px solid var(--line-2)"><h3>收款里程碑</h3></div>
       ${pays.length?`<div style="max-height:320px;overflow:auto"><table class="tbl"><tbody>${pays.map(t=>`
         <tr><td>${esc(t.name.replace('收款：',''))}</td>
             <td class="num muted" style="width:96px">${fmt(t._s)}</td>
             <td style="width:80px"><span class="pill ${(t.prog||0)>=100?'ok':''}">${(t.prog||0)>=100?'已收款':'未收款'}</span></td>
-            <td style="width:64px"><button class="btn sm gh" onclick="togglePay('${p.id}','${t.code}')">${(t.prog||0)>=100?'取消':'標記'}</button></td>
+            <td style="width:64px">${t.src?`<span class="muted" style="font-size:11.5px" title="由${esc(t.src)}自動帶入">🔒 自動</span>`
+              :`<button class="btn sm gh" onclick="togglePay('${p.id}','${t.code}')">${(t.prog||0)>=100?'取消':'標記'}</button>`}</td>
         </tr>`).join('')}</tbody></table></div>`:`<div class="empty">無收款項目</div>`}
     </div>
   </div>`;
@@ -1912,6 +2026,7 @@ function setProg(pid,code,v){
 }
 function togglePay(pid,code){
   const t=DB.projects.find(x=>x.id===pid).tasks.find(t=>t.code===code);
+  if(t.src) return toast('這期收款由'+t.src+'自動帶入，請到來源修改');
   const on=(t.prog||0)>=100;
   t.prog=on?0:100; t.actEnd=on?'':today();
   if(!on&&!t.actStart) t.actStart=today();
@@ -2021,6 +2136,7 @@ function taskForm(pid,code){
   const vr=code?variance(t):0;
 
   const info=`<div class="modal-b">
+    ${t.src?`<div class="srcnote">🔒 這個任務由「${esc(t.src)}」自動帶入，請到來源修改；在這裡改會在下次同步時被蓋掉。</div>`:''}
     <div class="row4">
       <label class="field"><span>WBS 編碼 *</span><input id="t_code" value="${t.code}" ${code?'readonly':''}></label>
       <label class="field"><span>原定工期（天）</span><input id="t_dur" type="number" min="1" value="${t.dur||1}"></label>
@@ -2323,7 +2439,7 @@ const FIREBASE_CONFIG = {
 const COL_META='hubMeta', COL_PROJ='hubProjects', COL_PHOTO='hubPhotos';
 const FB_ON = !/^PASTE/.test(FIREBASE_CONFIG.apiKey);
 let fbAuth=null, fbDb=null, fbUser=null, cloudReady=false, pushTimer=null;
-let unsubProj=null, unsubMeta=null;
+let unsubProj=null, unsubMeta=null, unsubSales=null;
 let lastPushed={};              // projectId -> 上次推上去的內容，沒變就不重送
 const photoCache={};            // photoId -> base64，避免重複下載
 let applyingRemote=false;       // 正在套用遠端資料，不要反彈回寫
@@ -2364,6 +2480,7 @@ window.cloudSignIn=function(){
 };
 window.cloudSignOut=function(){ if(fbAuth) fbAuth.signOut(); };
 function teardownCloud(){
+  if(unsubSales){unsubSales();unsubSales=null;} SALES=null;
   if(unsubProj){unsubProj();unsubProj=null;}
   if(unsubMeta){unsubMeta();unsubMeta=null;}
   cloudReady=false; lastPushed={}; renderAuthUI();
@@ -2386,6 +2503,13 @@ function checkAllowlist(u){
   });
 }
 function subscribeCloud(){
+  // 業務戰情表跟專案系統同一個 Firebase、同一份白名單，登入後直接讀得到
+  unsubSales=fbDb.collection('warRoom').doc('shared').onSnapshot(snap=>{
+    if(!snap.exists) return;
+    try{ const d=JSON.parse(snap.data().json||'{}'); SALES={billing:d.billing||[]}; }
+    catch(e){ console.error('[sales] 業務戰情解析失敗',e); return; }
+    applySales(); render();
+  },err=>console.warn('[sales] 讀不到業務戰情（不影響專案系統）',err));
   unsubMeta=fbDb.collection(COL_META).doc('shared').onSnapshot(snap=>{
     if(snap.metadata.hasPendingWrites || !snap.exists) return;
     try{
@@ -2414,6 +2538,7 @@ function subscribeCloud(){
     });
     migrate(DB);
     cloudReady=true; applyingRemote=false;
+    applySales();
     saveLocal(); renderAuthUI();
     if(changed){ render(); if(!snap.metadata.fromCache && snap.docChanges().length) toast('已同步雲端最新資料'); }
     if(!snap.empty) return;
