@@ -745,9 +745,47 @@ function epcTasks(site){
   });
   return {tasks:out,unmatched};
 }
+/**
+ * 工程戰情室的既有案場也要出現在專案系統：
+ *  1. 還沒對應的專案，案名明確包含某個案場（且只有一個）→ 直接對上，不重複開案
+ *  2. 沒有任何專案對應的案場 → 自動開案（固定 id「e-案場編號」，大家開出來都是同一個）
+ *  3. 之後別的專案也對應到同一個案場 → 沒用過的自動案收掉
+ */
+const epcAutoId=x=>'e-'+x.id;
+function epcAutoProjects(){
+  if(!EPC||!cloudReady||!metaReady) return 0;
+  let n=0;
+  const byHand=new Set(DB.projects.filter(p=>!p.autoFromEpc&&p.epcSiteId!=null&&p.epcSiteId!=='').map(p=>String(p.epcSiteId)));
+  DB.projects.forEach(p=>{
+    if(p.autoFromEpc||(p.epcSiteId!=null&&p.epcSiteId!=='')||p.epcManual) return;
+    const c=epcCore(p.name); if(c.length<2) return;
+    // 名稱短（2~3 字）要完全一樣；4 字以上可以是包含關係
+    const hits=EPC.filter(x=>{ const k=epcCore(x.name); if(!k||byHand.has(String(x.id))) return false;
+      return c.length<4||k.length<4?k===c:(k.includes(c)||c.includes(k)); });
+    if(hits.length===1){ p.epcSiteId=String(hits[0].id); byHand.add(p.epcSiteId); n++; }
+  });
+  const ignored=new Set(DB.epcIgnored||[]);
+  EPC.forEach(x=>{
+    const sid=String(x.id), id=epcAutoId(x);
+    if(byHand.has(sid)||ignored.has(sid)||DB.projects.some(p=>p.id===id)) return;
+    DB.projects.push(blankProject({id,code:'E-'+x.id,name:x.name||('工程案場 '+x.id),
+      status:{done:'已完工',pending:'規劃中'}[x.status]||'進行中',customer:x.owner||'',owner:x.pm||'',
+      category:/儲能/.test(x.type||'')&&!/太陽能/.test(x.type||'')?'儲能':'太陽光電',
+      start:epcYmd(x.start_date)||today(),due:epcYmd(x.end_date),
+      epcSiteId:sid,autoFromEpc:true,note:'由工程戰情室案場自動開案'}));
+    n++;
+  });
+  const before=DB.projects.length;
+  DB.projects=DB.projects.filter(p=>{
+    if(!p.autoFromEpc) return true;
+    const dup=byHand.has(String(p.epcSiteId));
+    return !(dup&&!(p.files||[]).length&&!(p.forms||[]).length);
+  });
+  return n+(before-DB.projects.length);
+}
 function applyEpc(){
   if(!EPC||!cloudReady) return 0;
-  let changed=0;
+  let changed=epcAutoProjects();
   DB.projects.forEach(p=>{
     if(p.epcSiteId==null||p.epcSiteId==='') return;
     const site=EPC.find(x=>String(x.id)===String(p.epcSiteId)); if(!site) return;
@@ -774,7 +812,7 @@ function applyEpc(){
 window.epcLink=function(pid,sid){
   const p=DB.projects.find(x=>x.id===pid); if(!p) return;
   if(sid===''||sid==null){
-    p.epcSiteId=''; delete p.epc;
+    p.epcSiteId=''; p.epcManual=true; delete p.epc;
     p.tasks.forEach(t=>{ if(t.src===SRC_EPC) delete t.src; });
     save(); render(); return toast('已取消對應工程案場');
   }
@@ -2265,6 +2303,7 @@ function doDelProject(id){
   // 連帶清掉這個案子在雲端的照片，不然會變成沒人認領的孤兒檔
   if(p) (p.forms||[]).forEach(f=>(f.photos||[]).forEach(ph=>cloudDelPhoto(ph.id)));
   if(p&&p.salesId){ DB.salesIgnored=[...new Set([...(DB.salesIgnored||[]),p.salesId])]; }
+  if(p&&p.autoFromEpc){ DB.epcIgnored=[...new Set([...(DB.epcIgnored||[]),String(p.epcSiteId)])]; }
   DB.projects=DB.projects.filter(x=>x.id!==id);
   save(); closeModal(); go('#/projects'); toast('已刪除專案');
 }
@@ -2674,7 +2713,8 @@ function subscribeCloud(){
       applyingRemote=true;
       if(m.formTpls) DB.formTpls=m.formTpls;
       if(m.salesIgnored) DB.salesIgnored=m.salesIgnored;
-      applyingRemote=false; metaReady=true; applySales(); render();
+      if(m.epcIgnored) DB.epcIgnored=m.epcIgnored;
+      applyingRemote=false; metaReady=true; applySales(); applyEpc(); render();
     }catch(e){ console.error('[cloud] meta 解析失敗',e); }
   },err=>console.error('[cloud] meta 監聽錯誤',err));
 
@@ -2724,7 +2764,7 @@ function pushCloud(){
   Object.keys(lastPushed).forEach(id=>{      // 本機刪掉的，雲端也刪
     if(!alive[id]){ delete lastPushed[id]; fbDb.collection(COL_PROJ).doc(id).delete().catch(()=>{}); }
   });
-  const meta=JSON.stringify({formTpls:DB.formTpls,salesIgnored:DB.salesIgnored||[]});
+  const meta=JSON.stringify({formTpls:DB.formTpls,salesIgnored:DB.salesIgnored||[],epcIgnored:DB.epcIgnored||[]});
   if(lastPushed.__meta!==meta){
     lastPushed.__meta=meta;
     fbDb.collection(COL_META).doc('shared').set({json:meta,updatedAt:stamp,updatedBy:by}).catch(()=>{});
