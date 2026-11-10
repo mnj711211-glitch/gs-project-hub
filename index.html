@@ -343,6 +343,7 @@ table.tbl tbody tr:last-child td{border-bottom:none}
 .flow-l{display:inline-block;margin-top:5px;font-size:11.5px;color:inherit;text-decoration:underline}
 .flow-l.off{opacity:.55;text-decoration:none}
 .srcnote{background:var(--brand-soft);border-radius:8px;padding:8px 12px;font-size:12.5px;margin-bottom:12px}
+.epcsel{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:inherit;font:inherit;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -683,6 +684,130 @@ function flowHTML(p){
              :`<span class="flow-l off">戰情室待建</span>`}
     </div>`).join('')}</div></div>`;
 }
+/* ======================= 工程戰情室 → 專案系統 =======================
+   工程戰情室的資料在 Supabase，公開金鑰就讀得到（跟工程戰情室網頁用的同一把）。
+   專案選好「對應工程案場」後，工項進度與起迄自動帶入 5.x；以工程戰情為準。 */
+const EPC_SB={url:'https://tqczsusfovgasmdlifdk.supabase.co',
+  key:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxY3pzdXNmb3ZnYXNtZGxpZmRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzE5MDYsImV4cCI6MjA5NjcwNzkwNn0.prkvN2iguEolMFe4fLew12nvSVNdJUKEmR_C3TIxcmg'};
+const SRC_EPC='工程戰情';
+/** 工項名稱 → WBS 編碼（關鍵字由上往下比，第一個命中生效；與 gs-hub-sync/wbs_map.json 相同） */
+const EPC_RULES=[[["前期作業", "啟始會議"], ["5.1.1"]], [["協議組織", "協調會"], ["5.1.2"]], [["報竣", "掛表", "竣工送電"], ["3.7"]], [["併接", "並接", "台電測試"], ["5.2.10"]], [["監視設備"], ["5.2.12"]], [["支架及模組", "支架與模組"], ["5.2.2", "5.2.4"]], [["整地", "基礎", "土建", "柏油", "道路", "鋼構", "設備基礎"], ["5.2.1"]], [["支架", "結構"], ["5.2.2"]], [["安全措施", "勞安", "圍籬"], ["5.2.3"]], [["模組", "電池模組"], ["5.2.4"]], [["直流", "DC"], ["5.2.5"]], [["變流器", "逆變器", "PCS", "BMS", "儲能櫃", "機電設備"], ["5.2.6"]], [["盤體", "高壓設備", "配電場所", "變壓器"], ["5.2.7"]], [["系統測試", "單機測試", "充放電測試"], ["5.2.9"]], [["交流", "AC", "電纜敷設", "接地", "線槽", "拉線", "埋管", "配線"], ["5.2.8"]], [["清洗水路"], ["5.2.11"]], [["監控", "通訊", "EMS"], ["5.2.12"]], [["機電平台"], ["5.2.13"]], [["驗收", "移交"], ["6.4"]], [["雜項"], ["5.2.1"]]];
+let EPC=null, epcTimer=null;
+function epcLoad(){
+  if(!cloudReady) return;
+  fetch(EPC_SB.url+'/rest/v1/sites?select=*&order=id',{headers:{apikey:EPC_SB.key,Authorization:'Bearer '+EPC_SB.key}})
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(rows=>{ EPC=rows; if(applyEpc()) render(); else if(route.view==='project') render(); })
+    .catch(e=>console.warn('[epc] 讀不到工程戰情室（不影響專案系統）',e));
+  clearTimeout(epcTimer); epcTimer=setTimeout(epcLoad,10*60*1000);   // 開著就每 10 分鐘更新一次
+}
+const epcYmd=v=>{ const m=String(v||'').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:''; };
+function epcCore(n){ return String(n||'').replace(/[\s()（）_\-]/g,'').replace(/太陽光電|太陽能|發電|系統|建置|工程|承攬|儲能|PV|及|股份有限公司|有限公司/g,''); }
+function epcSimilar(a,b){
+  a=epcCore(a); b=epcCore(b); if(!a||!b) return 0;
+  if(a.includes(b)||b.includes(a)) return 0.95;
+  const bg=x=>new Set([...x].map((c,i)=>x.slice(i,i+2)).filter(g=>g.length===2));
+  const A=bg(a),B=bg(b); let n=0; A.forEach(g=>{ if(B.has(g)) n++; });
+  return A.size+B.size?2*n/(A.size+B.size):0;
+}
+function epcSuggest(p){
+  return (EPC||[]).map(x=>({x,sc:Math.max(epcSimilar(p.name,x.name),epcSimilar(p.name,x.label||''))}))
+    .filter(o=>o.sc>=0.5).sort((a,b)=>b.sc-a.sc).slice(0,3).map(o=>o.x);
+}
+function epcMatch(name){
+  for(const [kw,to] of EPC_RULES) if(kw.some(k=>name.toLowerCase().includes(k.toLowerCase()))) return to;
+  return [];
+}
+/** 一個工程案場 → 各 WBS 的進度與日期（多個工項對到同一個 WBS 時依權重加權） */
+function epcTasks(site){
+  const wbs=site.wbs||{}, dates=site.wbs_dates||{};
+  const items=(Array.isArray(site.wbs_items)&&site.wbs_items.length)?site.wbs_items:Object.keys(wbs).map(n=>({name:n,weight:1}));
+  const acc={}, unmatched=[];
+  items.forEach(it=>{
+    const codes=epcMatch(it.name); if(!codes.length){ unmatched.push(it.name); return; }
+    const w=+it.weight||1, pct=+wbs[it.name]||0, d=dates[it.name]||{};
+    codes.forEach(c=>{
+      const a=acc[c]||(acc[c]={sw:0,sp:0,items:[],as:[],ae:[],ps:[],pe:[],done:true});
+      a.sw+=w; a.sp+=w*pct; a.items.push(`${it.name} ${pct}%`); a.done=a.done&&pct>=100;
+      ['as','ae','ps','pe'].forEach(k=>{ const v=epcYmd(d[k]); if(v) a[k].push(v); });
+    });
+  });
+  const out=Object.entries(acc).map(([code,a])=>{
+    const o={prog:a.sw?Math.round(a.sp/a.sw):0};
+    o.actStart=a.as.length?a.as.sort()[0]:'';
+    o.actEnd=a.done&&a.ae.length?a.ae.sort().slice(-1)[0]:'';
+    if(a.ps.length&&a.pe.length){ o.planStart=a.ps.sort()[0]; o.planEnd=a.pe.sort().slice(-1)[0]; }
+    // 早期完工的案場只記了 100%、沒記工項日期 → 用案場開工／完工日代入
+    let guess='';
+    if(o.prog>0&&!o.actStart&&epcYmd(site.start_date)){ o.actStart=epcYmd(site.start_date); guess='（日期以案場開工／完工日代入）'; }
+    if(a.done&&!o.actEnd&&epcYmd(site.end_date)){ o.actEnd=epcYmd(site.end_date); guess='（日期以案場開工／完工日代入）'; }
+    return {code,o,note:'工程戰情：'+a.items.join('、')+guess};
+  });
+  return {tasks:out,unmatched};
+}
+function applyEpc(){
+  if(!EPC||!cloudReady) return 0;
+  let changed=0;
+  DB.projects.forEach(p=>{
+    if(p.epcSiteId==null||p.epcSiteId==='') return;
+    const site=EPC.find(x=>String(x.id)===String(p.epcSiteId)); if(!site) return;
+    const {tasks,unmatched}=epcTasks(site);
+    tasks.forEach(({code,o,note})=>{
+      const t=p.tasks.find(x=>x.code===code); if(!t) return;
+      if(t.src!==SRC_EPC){ t.src=SRC_EPC; changed++; }
+      const diff=Object.keys(o).filter(k=>(t[k]??'')!==o[k]);
+      if(!diff.length) return;
+      diff.forEach(k=>t[k]=o[k]);
+      t.logs=(t.logs||[]).filter(l=>!(l.auto&&l.who==='🤖'+SRC_EPC&&l.ts===today()));
+      t.logs.push({ts:today(),who:'🤖'+SRC_EPC,text:note,auto:true});
+      changed++;
+    });
+    const info={id:site.id,name:site.name||'',pct:+site.pct||0,status:site.status||'',pm:site.pm||'',unmatched};
+    if(JSON.stringify(p.epc||{})!==JSON.stringify(info)){ p.epc=info; changed++; }
+    // 基本資料只補空白欄
+    const fill={site:site.addr||'',capacity:site.mw?String(site.mw):'',essCapacity:site.mwh?String(site.mwh):''};
+    Object.entries(fill).forEach(([k,v])=>{ if(v&&!p[k]){ p[k]=v; changed++; } });
+  });
+  if(changed){ saveLocal(); cloudSchedulePush(); }
+  return changed;
+}
+window.epcLink=function(pid,sid){
+  const p=DB.projects.find(x=>x.id===pid); if(!p) return;
+  if(sid===''||sid==null){
+    p.epcSiteId=''; delete p.epc;
+    p.tasks.forEach(t=>{ if(t.src===SRC_EPC) delete t.src; });
+    save(); render(); return toast('已取消對應工程案場');
+  }
+  p.epcSiteId=String(sid); applyEpc(); save(); render();
+  toast('已對應工程案場，施工進度自動帶入');
+};
+function epcHTML(p){
+  if(!cloudReady) return `<div class="empty">登入雲端後顯示工程戰情室的施工進度</div>`;
+  if(!EPC) return `<div class="empty">讀取工程戰情室中…</div>`;
+  const opts=(cur)=>`<select class="epcsel" onchange="epcLink('${p.id}',this.value)">
+      <option value="">${cur?'（取消對應）':'選擇工程戰情室的案場…'}</option>
+      ${EPC.map(x=>`<option value="${x.id}"${String(x.id)===String(cur)?' selected':''}>${esc(x.name)}（${+x.pct||0}%）</option>`).join('')}</select>`;
+  if(p.epc){
+    const e=p.epc;
+    return `<div style="padding:12px 16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <b>${esc(e.name)}</b><span class="pill ${e.pct>=100?'ok':''}">工程進度 ${e.pct}%</span>
+        ${e.pm?`<span class="muted" style="font-size:12.5px">工地主任 ${esc(e.pm)}</span>`:''}
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap">
+        <span>5.x 工程施工自動帶入，每 10 分鐘更新</span>
+        <a class="link" href="${EPC_URL}" target="_blank" rel="noopener">開啟工程戰情 ↗</a>
+      </div>
+      ${e.unmatched&&e.unmatched.length?`<div class="muted" style="font-size:12px;margin-top:4px">未對應 WBS 的工項：${esc(e.unmatched.join('、'))}</div>`:''}
+      <div style="margin-top:8px">${opts(p.epcSiteId)}</div></div>`;
+  }
+  const sug=epcSuggest(p);
+  return `<div style="padding:12px 16px">
+    <div class="muted" style="font-size:12.5px;margin-bottom:8px">還沒對應工程戰情室的案場${sug.length?'，系統依案名推薦：':''}</div>
+    ${sug.map(x=>`<button class="btn sm" style="margin:0 6px 6px 0" onclick="epcLink('${p.id}','${x.id}')">🔗 ${esc(x.name)}（${+x.pct||0}%）</button>`).join('')}
+    <div>${opts('')}</div></div>`;
+}
+
 function contractsHTML(p){
   const cs=p.contracts||[];
   if(!SALES) return `<div class="empty">登入雲端後顯示業務戰情表的合約</div>`;
@@ -1276,7 +1401,9 @@ function viewOverview(p){
       :`<div class="empty">還沒有任何進度日誌</div>`}
     </div>
     <div class="card">
-      <div class="card-h"><h3>業務合約</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：業務戰情表</span></div>
+      <div class="card-h"><h3>工程戰情</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：工程戰情室</span></div>
+      ${epcHTML(p)}
+      <div class="card-h" style="border-top:1px solid var(--line-2)"><h3>業務合約</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：業務戰情表</span></div>
       ${contractsHTML(p)}
       <div class="card-h" style="border-top:1px solid var(--line-2)"><h3>收款里程碑</h3></div>
       ${pays.length?`<div style="max-height:320px;overflow:auto"><table class="tbl"><tbody>${pays.map(t=>`
@@ -2509,6 +2636,7 @@ window.cloudSignIn=function(){
 window.cloudSignOut=function(){ if(fbAuth) fbAuth.signOut(); };
 function teardownCloud(){
   if(unsubSales){unsubSales();unsubSales=null;} SALES=null; metaReady=false;
+  clearTimeout(epcTimer); epcTimer=null; EPC=null;
   if(unsubProj){unsubProj();unsubProj=null;}
   if(unsubMeta){unsubMeta();unsubMeta=null;}
   cloudReady=false; lastPushed={}; renderAuthUI();
@@ -2568,7 +2696,8 @@ function subscribeCloud(){
     });
     migrate(DB);
     cloudReady=true; applyingRemote=false;
-    applySales();
+    applySales(); applyEpc();
+    if(!EPC&&!epcTimer) epcLoad();
     saveLocal(); renderAuthUI();
     if(changed){ render(); if(!snap.metadata.fromCache && snap.docChanges().length) toast('已同步雲端最新資料'); }
     if(!snap.empty) return;
