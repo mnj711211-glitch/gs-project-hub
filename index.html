@@ -665,7 +665,7 @@ function flowSteps(p){
   const steps=[
     {n:'業務簽約',d:'業務',v:prog('1.2'),url:sales},
     {n:'啟始會議',d:'業務',v:prog('1.3'),url:sales},
-    {n:'設計出圖・採購清單',d:'設計',v:prog('2'),url:''},
+    {n:'設計出圖・採購清單',d:'設計',v:prog('2'),url:DESIGN_URL},
     {n:'跑件申辦',d:'PM',v:prog('3'),url:''},
     {n:'採購發包',d:'採購',v:prog('4'),url:''},
     {n:'工程施工',d:'工程',v:prog('5'),url:EPC_URL},
@@ -843,6 +843,202 @@ function epcHTML(p){
   return `<div style="padding:12px 16px">
     <div class="muted" style="font-size:12.5px;margin-bottom:8px">還沒對應工程戰情室的案場${sug.length?'，系統依案名推薦：':''}</div>
     ${sug.map(x=>`<button class="btn sm" style="margin:0 6px 6px 0" onclick="epcLink('${p.id}','${x.id}')">🔗 ${esc(x.name)}（${+x.pct||0}%）</button>`).join('')}
+    <div>${opts('')}</div></div>`;
+}
+
+/* ======================= 設計戰情版 → 專案系統 =======================
+   設計戰情是另一個 Firebase 專案（gst-design-war-room），要用它自己的登入；
+   第一次在這裡按「連結設計戰情」登入一次，之後瀏覽器會記住。
+   圖件步驟 → 2.x 任務、異動紀錄 → 實際起迄、雲端硬碟圖檔 → 文件頁；以設計戰情為準。 */
+const DESIGN_URL='https://gst-design-war-room.web.app/';
+const DESIGN_CFG={apiKey:'AIzaSyCp-6RVI0v4HrcRJYt9t8t5R22UMM92klo',authDomain:'gst-design-war-room.firebaseapp.com',
+  projectId:'gst-design-war-room',storageBucket:'gst-design-war-room.firebasestorage.app',
+  messagingSenderId:'343572597071',appId:'1:343572597071:web:3ff530a5c04532a4f61d3a'};
+const SRC_DESIGN='設計戰情';
+/** 設計部出圖步驟 → 專案 WBS 與文件資料夾 */
+const DESIGN_STEPS={
+  '配置圖':{codes:['2.1'],folder:'2100'}, '串接圖':{codes:['2.1'],folder:'2100'},
+  '單線圖':{codes:['2.4'],folder:'2100'}, '施工圖':{codes:['2.7'],folder:'2300'},
+  '料件清單':{codes:['2.3'],folder:'2100'}, '圖說送審':{codes:['2.8'],folder:'2100'},
+  '竣工圖':{codes:[],folder:'6100'}};
+const DESIGN_PCT={done:100,wip:50,no:0}, DESIGN_ST={done:'完成',wip:'進行中',no:'未開始'};
+let dApp=null,dAuth=null,dDb=null,dUser=null,DESIGN=null,DESIGN_ERR='',unsubDesign=null,designTick=null;
+const DESIGN_DETAIL={};   // caseId → {ver,t,files,log}
+function designInit(){
+  if(dApp||typeof firebase==='undefined') return;
+  try{ dApp=firebase.initializeApp(DESIGN_CFG,'design'); dAuth=dApp.auth(); dDb=dApp.firestore(); }
+  catch(e){ console.error('[design] 初始化失敗',e); DESIGN_ERR='設計戰情初始化失敗'; return; }
+  dAuth.onAuthStateChanged(u=>{
+    dUser=u; if(unsubDesign){ unsubDesign(); unsubDesign=null; }
+    if(!u){ DESIGN=null; if(route.view==='project') render(); return; }
+    unsubDesign=dDb.collection('cases').onSnapshot(snap=>{
+      DESIGN=snap.docs.map(d=>Object.assign({id:d.id},d.data())); DESIGN_ERR='';
+      applyDesign(); designLoadDetails(); render();
+    },err=>{
+      console.warn('[design]',err); DESIGN=null;
+      DESIGN_ERR=err.code==='permission-denied'
+        ?`帳號 ${u.email} 還沒加入設計戰情的可登入名單，請設計戰情管理員到「設定」加入後再按重新連結`
+        :'讀取設計戰情失敗：'+(err.code||err.message);
+      render();
+    });
+  });
+  clearInterval(designTick); designTick=setInterval(designLoadDetails,10*60*1000);   // 圖檔新增不會改案子本身，定時重抓
+}
+window.designSignIn=function(){
+  designInit(); if(!dAuth) return toast('設計戰情尚未初始化');
+  const pv=new firebase.auth.GoogleAuthProvider();
+  if(fbUser&&fbUser.email) pv.setCustomParameters({login_hint:fbUser.email});
+  DESIGN_ERR='';
+  (dUser?dAuth.signOut():Promise.resolve()).then(()=>dAuth.signInWithPopup(pv)).catch(e=>{
+    console.error('[design] 登入失敗',e);
+    DESIGN_ERR=e.code==='auth/unauthorized-domain'
+      ?'設計戰情還沒開放這個網址登入：請管理員到設計戰情的 Firebase → Authentication → 授權網域，加入 '+location.hostname
+      :'連結設計戰情失敗：'+(e.code||e.message);
+    render();
+  });
+};
+const tsYmd=t=>{ if(!t) return ''; const d=t.toDate?t.toDate():(t.seconds?new Date(t.seconds*1000):new Date(t)); return isNaN(d)?'':fmt(d); };
+function designProg(c){
+  const live=Object.keys(DESIGN_STEPS).filter(s=>(c.steps||{})[s]&&(c.steps||{})[s]!=='na');
+  return {done:live.filter(s=>c.steps[s]==='done').length,all:live.length};
+}
+function designLoadDetails(){
+  if(!dDb||!DESIGN) return;
+  const ids=new Set(DB.projects.map(p=>p.designCaseId).filter(Boolean));
+  DESIGN.filter(c=>ids.has(c.id)).forEach(c=>{
+    const ver=(c.updatedAt&&c.updatedAt.seconds)||0, cur=DESIGN_DETAIL[c.id];
+    if(cur&&(cur.loading||(cur.ver===ver&&Date.now()-cur.t<9*60*1000))) return;
+    DESIGN_DETAIL[c.id]=Object.assign({files:[],log:[]},cur,{loading:true});
+    const ref=dDb.collection('cases').doc(c.id);
+    Promise.all([ref.collection('files').get(),ref.collection('log').get()]).then(([fs,ls])=>{
+      DESIGN_DETAIL[c.id]={ver,t:Date.now(),
+        files:fs.docs.map(d=>Object.assign({id:d.id},d.data())),log:ls.docs.map(d=>d.data())};
+      if(applyDesign()) render();
+    }).catch(e=>{ console.warn('[design] 讀取圖檔／紀錄失敗',c.id,e); DESIGN_DETAIL[c.id]={ver,t:Date.now(),files:[],log:[]}; });
+  });
+}
+/** 一個設計案 → 各 2.x 任務的進度、負責人、實際起迄（多個圖件對到同一任務取平均） */
+function designTasks(c,det){
+  const acc={};
+  Object.entries(DESIGN_STEPS).forEach(([step,m])=>{
+    const st=(c.steps||{})[step]; if(!st||st==='na'||!m.codes.length) return;
+    const logs=((det&&det.log)||[]).filter(l=>l.field===step).map(l=>({to:l.to,d:tsYmd(l.at)}))
+      .filter(l=>l.d).sort((a,b)=>a.d.localeCompare(b.d));
+    const started=logs.find(l=>l.to==='進行中'||l.to==='完成');
+    const fin=logs.filter(l=>l.to==='完成').pop();
+    m.codes.forEach(code=>{
+      const a=acc[code]||(acc[code]={sum:0,n:0,items:[],as:[],ae:[],done:true});
+      a.sum+=DESIGN_PCT[st]??0; a.n++; a.items.push(step+' '+(DESIGN_ST[st]||st)); a.done=a.done&&st==='done';
+      if(started) a.as.push(started.d);
+      if(st==='done'&&fin) a.ae.push(fin.d);
+    });
+  });
+  return Object.entries(acc).map(([code,a])=>{
+    const o={prog:Math.round(a.sum/a.n)};
+    if((c.owners||[]).length) o.owner=c.owners.join('、');
+    if(a.as.length) o.actStart=a.as.sort()[0];
+    o.actEnd=a.done&&a.ae.length?a.ae.sort().slice(-1)[0]:'';
+    return {code,o,note:'設計戰情：'+a.items.join('、')};
+  });
+}
+/** 設計案的自動對應／自動開案，做法跟工程案場一樣（固定 id「d-案件編號」） */
+function designAutoProjects(){
+  if(!DESIGN||!cloudReady||!metaReady) return 0;
+  let n=0;
+  const byHand=new Set(DB.projects.filter(p=>!p.autoFromDesign&&p.designCaseId).map(p=>p.designCaseId));
+  DB.projects.forEach(p=>{
+    if(p.autoFromDesign||p.designCaseId||p.designManual) return;
+    const c=epcCore(p.name); if(c.length<2) return;
+    const hits=DESIGN.filter(x=>{ const k=epcCore(x.name); if(!k||byHand.has(x.id)) return false;
+      return c.length<4||k.length<4?k===c:(k.includes(c)||c.includes(k)); });
+    if(hits.length===1){ p.designCaseId=hits[0].id; byHand.add(p.designCaseId); n++; }
+  });
+  const ignored=new Set(DB.designIgnored||[]);
+  DESIGN.forEach(x=>{
+    const id='d-'+x.id;
+    if(byHand.has(x.id)||ignored.has(x.id)||DB.projects.some(p=>p.id===id)) return;
+    DB.projects.push(blankProject({id,code:'D-'+x.id.slice(0,6),name:x.name||'設計案',status:'規劃中',
+      note:'由設計戰情版自動開案'+(x.kind?'（'+x.kind+'）':''),designCaseId:x.id,autoFromDesign:true}));
+    n++;
+  });
+  const before=DB.projects.length;
+  DB.projects=DB.projects.filter(p=>!(p.autoFromDesign&&byHand.has(p.designCaseId)&&!(p.files||[]).some(f=>f.src!==SRC_DESIGN)&&!(p.forms||[]).length));
+  return n+(before-DB.projects.length);
+}
+function applyDesign(){
+  if(!DESIGN||!cloudReady) return 0;
+  let changed=designAutoProjects();
+  DB.projects.forEach(p=>{
+    if(!p.designCaseId) return;
+    const c=DESIGN.find(x=>x.id===p.designCaseId); if(!c) return;
+    const det=DESIGN_DETAIL[c.id];
+    designTasks(c,det).forEach(({code,o,note})=>{
+      const t=p.tasks.find(x=>x.code===code); if(!t) return;
+      if(t.src!==SRC_DESIGN){ t.src=SRC_DESIGN; changed++; }
+      const diff=Object.keys(o).filter(k=>(t[k]??'')!==o[k]);
+      if(!diff.length) return;
+      diff.forEach(k=>t[k]=o[k]);
+      t.logs=(t.logs||[]).filter(l=>!(l.auto&&l.who==='🤖'+SRC_DESIGN&&l.ts===today()));
+      t.logs.push({ts:today(),who:'🤖'+SRC_DESIGN,text:note,auto:true});
+      changed++;
+    });
+    if(det&&!det.loading){
+      const want=det.files.map(f=>{ const m=DESIGN_STEPS[f.step]||{};
+        return {id:'dz-'+f.id,folder:m.folder||'2100',cat:'任務相關',task:(m.codes||[])[0]||'',name:f.name||'',no:'',
+          type:String(f.name||'').split('.').pop().toLowerCase(),flowOwner:f.by||'',flow:'已歸檔',url:f.url||'',
+          mt:f.at&&f.at.seconds?f.at.seconds*1000:0,src:SRC_DESIGN}; });
+      const next=[...(p.files||[]).filter(f=>f.src!==SRC_DESIGN),...want];
+      if(JSON.stringify(p.files||[])!==JSON.stringify(next)){ p.files=next; changed++; }
+    }
+    const g=designProg(c);
+    const info={id:c.id,name:c.name||'',done:g.done,all:g.all,
+      wip:Object.keys(DESIGN_STEPS).find(s=>(c.steps||{})[s]==='wip')||'',
+      owners:(c.owners||[]).join('、'),files:det&&!det.loading?det.files.length:null};
+    if(JSON.stringify(p.design||{})!==JSON.stringify(info)){ p.design=info; changed++; }
+  });
+  if(changed){ saveLocal(); cloudSchedulePush(); }
+  return changed;
+}
+window.designLink=function(pid,cid){
+  const p=DB.projects.find(x=>x.id===pid); if(!p) return;
+  if(!cid){
+    p.designCaseId=''; p.designManual=true; delete p.design;
+    p.tasks.forEach(t=>{ if(t.src===SRC_DESIGN) delete t.src; });
+    p.files=(p.files||[]).filter(f=>f.src!==SRC_DESIGN);
+    save(); render(); return toast('已取消對應設計案');
+  }
+  p.designCaseId=cid; applyDesign(); designLoadDetails(); save(); render();
+  toast('已對應設計案，圖件進度自動帶入');
+};
+function designHTML(p){
+  if(!cloudReady) return `<div class="empty">登入雲端後顯示設計戰情的圖件進度</div>`;
+  const btn=`<button class="btn sm" onclick="designSignIn()">${dUser?'重新連結設計戰情':'連結設計戰情'}</button>`;
+  if(DESIGN_ERR) return `<div style="padding:12px 16px"><div class="srcnote" style="margin-bottom:8px">⚠ ${esc(DESIGN_ERR)}</div>${btn}</div>`;
+  if(!dUser) return `<div style="padding:12px 16px"><div class="muted" style="font-size:12.5px;margin-bottom:8px">
+      設計戰情是另一個系統，第一次要再用 Google 登入一次，之後會記住。</div>${btn}</div>`;
+  if(!DESIGN) return `<div class="empty">讀取設計戰情中…</div>`;
+  const opts=cur=>`<select class="epcsel" onchange="designLink('${p.id}',this.value)">
+      <option value="">${cur?'（取消對應）':'選擇設計戰情的案子…'}</option>
+      ${DESIGN.map(x=>{const g=designProg(x);return `<option value="${esc(x.id)}"${x.id===cur?' selected':''}>${esc(x.name)}（${g.done}/${g.all}）</option>`;}).join('')}</select>`;
+  if(p.design){
+    const e=p.design;
+    return `<div style="padding:12px 16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <b>${esc(e.name)}</b><span class="pill ${e.all&&e.done>=e.all?'ok':''}">圖件 ${e.done} / ${e.all} 完成</span>
+        ${e.wip?`<span class="muted" style="font-size:12.5px">進行中：${esc(e.wip)}</span>`:''}
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap">
+        ${e.owners?`<span>負責 ${esc(e.owners)}</span>`:''}
+        ${e.files!=null?`<span>圖檔 ${e.files} 份（在「文件」頁）</span>`:''}
+        <a class="link" href="${DESIGN_URL}" target="_blank" rel="noopener">開啟設計戰情 ↗</a>
+      </div>
+      <div style="margin-top:8px">${opts(p.designCaseId)}</div></div>`;
+  }
+  const sug=(DESIGN||[]).map(x=>({x,sc:epcSimilar(p.name,x.name)})).filter(o=>o.sc>=0.5)
+    .sort((a,b)=>b.sc-a.sc).slice(0,3).map(o=>o.x);
+  return `<div style="padding:12px 16px">
+    <div class="muted" style="font-size:12.5px;margin-bottom:8px">還沒對應設計戰情的案子${sug.length?'，系統依案名推薦：':''}</div>
+    ${sug.map(x=>`<button class="btn sm" style="margin:0 6px 6px 0" onclick="designLink('${p.id}','${esc(x.id)}')">🔗 ${esc(x.name)}</button>`).join('')}
     <div>${opts('')}</div></div>`;
 }
 
@@ -1439,7 +1635,9 @@ function viewOverview(p){
       :`<div class="empty">還沒有任何進度日誌</div>`}
     </div>
     <div class="card">
-      <div class="card-h"><h3>工程戰情</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：工程戰情室</span></div>
+      <div class="card-h"><h3>設計戰情</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：設計戰情版</span></div>
+      ${designHTML(p)}
+      <div class="card-h" style="border-top:1px solid var(--line-2)"><h3>工程戰情</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：工程戰情室</span></div>
       ${epcHTML(p)}
       <div class="card-h" style="border-top:1px solid var(--line-2)"><h3>業務合約</h3><div class="sp"></div><span class="muted" style="font-size:12px">來源：業務戰情表</span></div>
       ${contractsHTML(p)}
@@ -2304,6 +2502,7 @@ function doDelProject(id){
   if(p) (p.forms||[]).forEach(f=>(f.photos||[]).forEach(ph=>cloudDelPhoto(ph.id)));
   if(p&&p.salesId){ DB.salesIgnored=[...new Set([...(DB.salesIgnored||[]),p.salesId])]; }
   if(p&&p.autoFromEpc){ DB.epcIgnored=[...new Set([...(DB.epcIgnored||[]),String(p.epcSiteId)])]; }
+  if(p&&p.autoFromDesign){ DB.designIgnored=[...new Set([...(DB.designIgnored||[]),p.designCaseId])]; }
   DB.projects=DB.projects.filter(x=>x.id!==id);
   save(); closeModal(); go('#/projects'); toast('已刪除專案');
 }
@@ -2698,6 +2897,7 @@ function checkAllowlist(u){
   });
 }
 function subscribeCloud(){
+  designInit();
   // 業務戰情表跟專案系統同一個 Firebase、同一份白名單，登入後直接讀得到
   unsubSales=fbDb.collection('warRoom').doc('shared').onSnapshot(snap=>{
     if(!snap.exists) return;
@@ -2714,7 +2914,8 @@ function subscribeCloud(){
       if(m.formTpls) DB.formTpls=m.formTpls;
       if(m.salesIgnored) DB.salesIgnored=m.salesIgnored;
       if(m.epcIgnored) DB.epcIgnored=m.epcIgnored;
-      applyingRemote=false; metaReady=true; applySales(); applyEpc(); render();
+      if(m.designIgnored) DB.designIgnored=m.designIgnored;
+      applyingRemote=false; metaReady=true; applySales(); applyEpc(); applyDesign(); render();
     }catch(e){ console.error('[cloud] meta 解析失敗',e); }
   },err=>console.error('[cloud] meta 監聽錯誤',err));
 
@@ -2736,7 +2937,7 @@ function subscribeCloud(){
     });
     migrate(DB);
     cloudReady=true; applyingRemote=false;
-    applySales(); applyEpc();
+    applySales(); applyEpc(); applyDesign(); designLoadDetails();
     if(!EPC&&!epcTimer) epcLoad();
     saveLocal(); renderAuthUI();
     if(changed){ render(); if(!snap.metadata.fromCache && snap.docChanges().length) toast('已同步雲端最新資料'); }
@@ -2764,7 +2965,7 @@ function pushCloud(){
   Object.keys(lastPushed).forEach(id=>{      // 本機刪掉的，雲端也刪
     if(!alive[id]){ delete lastPushed[id]; fbDb.collection(COL_PROJ).doc(id).delete().catch(()=>{}); }
   });
-  const meta=JSON.stringify({formTpls:DB.formTpls,salesIgnored:DB.salesIgnored||[],epcIgnored:DB.epcIgnored||[]});
+  const meta=JSON.stringify({formTpls:DB.formTpls,salesIgnored:DB.salesIgnored||[],epcIgnored:DB.epcIgnored||[],designIgnored:DB.designIgnored||[]});
   if(lastPushed.__meta!==meta){
     lastPushed.__meta=meta;
     fbDb.collection(COL_META).doc('shared').set({json:meta,updatedAt:stamp,updatedBy:by}).catch(()=>{});
